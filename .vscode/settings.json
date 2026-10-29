@@ -1,0 +1,18 @@
+{
+    // --- COPILOT & DOX CONFIGURATION ---
+    "chat.useAgentsMdFile": true,
+    "chat.useNestedAgentsMdFiles": true,
+    "chat.useCustomizationsInParentRepositories": true,
+
+    // --- FILE VISIBILITY & CLEANUP ---
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        ".pytest_cache": true
+    },
+    "search.exclude": {
+        "**/__pycache__": true,
+        ".venv": true,
+        "build": true
+    }
+}
