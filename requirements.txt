@@ -1,0 +1,13 @@
+# Jeweils aktuelle stabile Veroeffentlichung von PyPI verwenden.
+pixxio-client
+nicegui>=3,<4
+pydantic>=2,<3
+pydantic-settings>=2,<3
+SQLAlchemy>=2,<3
+alembic>=1.16,<2
+cryptography>=46
+argon2-cffi>=25
+RestrictedPython>=8.5,<9
+openpyxl>=3.1,<4
+defusedxml>=0.7.1,<1
+python-multipart>=0.0.20,<1

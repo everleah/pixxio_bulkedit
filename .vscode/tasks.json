@@ -1,0 +1,53 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "quality: dependencies",
+            "type": "process",
+            "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+            "args": ["-m", "pip", "check"],
+            "problemMatcher": []
+        },
+        {
+            "label": "quality: lint",
+            "type": "process",
+            "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+            "args": ["-m", "ruff", "check", "."],
+            "problemMatcher": []
+        },
+        {
+            "label": "quality: format",
+            "type": "process",
+            "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+            "args": ["-m", "ruff", "format", "--check", "."],
+            "problemMatcher": []
+        },
+        {
+            "label": "quality: types",
+            "type": "process",
+            "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+            "args": ["-m", "pyright"],
+            "problemMatcher": []
+        },
+        {
+            "label": "quality: tests",
+            "type": "process",
+            "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+            "args": ["-m", "pytest", "-q"],
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "quality: all",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "quality: dependencies",
+                "quality: lint",
+                "quality: format",
+                "quality: types",
+                "quality: tests"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

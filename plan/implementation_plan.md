@@ -13,7 +13,11 @@ Geschrieben werden ausschliesslich ausdruecklich geaenderte Felder.
 Grundlagen:
 
 - [Fachkonzept](first_concept.md).
-- Lokaler Client: `C:\Development\VS Code Projects\pixxio_client`.
+- Client-Abhaengigkeit: aktuelle stabile Version von
+  [pixxio-client auf PyPI](https://pypi.org/project/pixxio-client/).
+- Lokaler Client als ergaenzende Informationsquelle:
+  `C:\Development\VS Code Projects\pixxio_client`; unveroeffentlichte Funktionen
+  duerfen nicht als verfuegbar vorausgesetzt werden.
 - Deployment-Vorbild: `C:\Development\VS Code Projects\pdfcrop-web`.
 
 Die folgenden bestaetigten Festlegungen ersetzen widersprechende Annahmen des
@@ -90,22 +94,26 @@ Zusaetzlich zum urspruenglichen Datenmodell:
 Filter und Sortierung beruecksichtigen den effektiven Arbeitsstand einschliesslich
 ausstehender Aenderungen.
 
-## 5. Phase 0 - Dokumentation und reproduzierbare Basis
+## 5. Phase 0 - Dokumentation und Entwicklungsbasis
 
 ### Aufgaben
 
 - Bestehendes Konzept mit den bestaetigten Entscheidungen abgleichen.
 - DOX-Hierarchie anhand der tatsaechlich entstehenden Zustaendigkeiten pflegen.
 - Projektgrundstruktur, Abhaengigkeiten und Pruefwerkzeuge festlegen.
-- Client-Stand auf einen festgelegten, getesteten Commit beziehen.
-- Daraus ein eindeutig versioniertes internes Wheel erstellen.
-- Wheel-Version und SHA-256 im App-Build festhalten.
-- Keine unkontrollierte Uebernahme des aktuellen lokalen Client-Ordners beim Docker-Build.
+- Immer die aktuelle stabile PyPI-Version von `pixxio-client` installieren
+  beziehungsweise explizit aktualisieren; keine Vorabversionen.
+- Keine internen Client-Wheels oder Installationen aus dem lokalen Nachbarprojekt verwenden.
+- Client nicht in Requirements oder Lock-Snapshot auf eine Version festlegen.
+- Bei Einrichtung, Wartungsupdates und neuen App-Builds den aktuellen Release
+  beziehen; kein automatisches Update im laufenden App-Prozess.
+- Installierte Version fuer Abnahmen dokumentieren und benoetigte Funktionen gegen
+  diesen Release pruefen. Bei fehlenden Funktionen den Umsetzungspfad klaeren.
 
 ### Abschlusskriterium
 
-Der benoetigte Client-Funktionsstand ist eindeutig identifizierbar und reproduzierbar
-installierbar.
+Die aktuelle stabile PyPI-Version ist installiert und dokumentiert; die fuer den
+naechsten Meilenstein benoetigten Funktionen sind gegen diesen Release geprueft.
 
 ## 6. Phase 1 - Machbarkeit und Lastnachweis
 
@@ -383,7 +391,7 @@ Import ohne Snapshot und Fehlerdatei-Download folgen erst danach.
 ## 14. Abhaengigkeiten und Reihenfolge
 
 ```text
-Reproduzierbare Basis
+Entwicklungsbasis mit aktuellem PyPI-Client
         |
 API-Spike + Grid-/Datenbank-Lastnachweis
         |

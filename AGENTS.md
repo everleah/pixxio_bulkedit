@@ -82,5 +82,22 @@ Default section order:
 ## Child DOX Index
 
 - `plan/AGENTS.md`: Fachkonzept, bestaetigter Umsetzungsplan und deren Vorrangregeln.
-- Root-owned: `README.md`, `LICENSE`, `.gitignore` und `.vscode/settings.json`.
-- Anwendungscode und ein Verifikationsframework sind noch nicht vorhanden.
+- `tests/AGENTS.md`: Offline-Tests, aktuell Import-Smoke-Tests der Entwicklungsbasis.
+- Root-owned: `README.md`, `LICENSE`, `.gitignore`, `requirements*.txt`,
+  `pyproject.toml` und `.vscode/` (Editor-Einstellungen, Erweiterungen, Quality-Tasks).
+- Anwendungscode ist noch nicht vorhanden.
+
+## Development Environment
+
+- Workspace-lokale `.venv` mit CPython 3.14 verwenden, keine Nachbarprojekt-Umgebung.
+- Direkte Abhaengigkeiten in `requirements.txt` und `requirements-dev.txt` pflegen;
+  `requirements-dev.lock.txt` ist der gepruefte Windows-/Python-3.14-Snapshot.
+- Fuer pixxio-client immer die aktuelle stabile PyPI-Version verwenden, kein internes
+  Wheel und keine Installation aus dem Nachbarprojekt. Bei Einrichtung und Updates
+  explizit `pip install --upgrade --index-url https://pypi.org/simple pixxio-client`
+  ausfuehren. Den Client auch im Lock-Snapshot ungepinnt lassen; nach Updates Gates pruefen.
+- Ruff und Pyright werden in `pyproject.toml` konfiguriert; Pylance nutzt dieselbe
+  Typpruefbasis. VS Code analysiert den gesamten Workspace.
+- Vor Abschluss relevanter Aenderungen die in `README.md` dokumentierten Gates
+  ausfuehren: `pip check`, Ruff-Lint, Ruff-Formatcheck, Pyright und pytest, jeweils
+  ueber `.\.venv\Scripts\python.exe -m ...`.
