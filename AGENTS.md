@@ -76,8 +76,11 @@ Default section order:
 
 ## User Preferences
 
-When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
+- Die bestaetigte Implementierungsgrundlage liegt in `plan/implementation_plan.md`;
+  sie hat bei Widerspruechen Vorrang vor dem urspruenglichen Fachkonzept.
 
 ## Child DOX Index
 
-This project is not yet indexed. Before continuing you must scan the project, build the DOX tree and replace this message with the actual index. Go deep and scan files recursively to properly evaluate complexity and create nested DOX files where needed.
+- `plan/AGENTS.md`: Fachkonzept, bestaetigter Umsetzungsplan und deren Vorrangregeln.
+- Root-owned: `README.md`, `LICENSE`, `.gitignore` und `.vscode/settings.json`.
+- Anwendungscode und ein Verifikationsframework sind noch nicht vorhanden.
