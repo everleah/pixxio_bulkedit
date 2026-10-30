@@ -17,8 +17,9 @@
 - `worker.py`: Kindprozess-Einstieg; baut den Client und schreibt genau ein Ergebnis.
 - `runner.py`: `ScriptRunner` (Pruefen, Parametertypen, Start mit Zeitlimit),
   `ScriptInterface` und `ScriptOutcome`.
-- `service.py`: Versionen anlegen, umbenennen, veroeffentlichen, Vorlagen sicherstellen,
-  Runs protokollieren, Rechtepruefung.
+- `service.py`: Versionen anlegen, umbenennen, loeschen (nur ohne Verwendung, Vorlagen
+  bleiben), veroeffentlichen, Vorlagen sicherstellen, Runs protokollieren,
+  Rechtepruefung; `script_usage_overview` zaehlt Arbeitsbestaende und Laeufe je Script.
 - `templates.py`: mitgelieferte Vorlagen (Collection, Verzeichnis, ID-Liste, Suche).
 
 ## Local Contracts
@@ -43,6 +44,10 @@
 - `rename_script` aendert nur den Namen (getrimmt, nicht leer, eindeutig) und erzeugt
   bewusst keine Version; Vorlagen bleiben auch hier gesperrt. Laeufe und Versionen haengen
   an der ID, nicht am Namen.
+- `delete_script` loescht nur unbenutzte, nicht als Vorlage markierte Scripts; die
+  Versionen verschwinden per `CASCADE`. Verweise aus Arbeitsbestaenden (`SET NULL`) und
+  Laeufen wuerden sonst still ihren Bezug verlieren, deshalb prueft `script_usage` vorher
+  und die Meldung nennt die Zahlen.
 - Nur `can_edit_scripts` (Superuser oder Recht) darf speichern/veroeffentlichen;
   Ausfuehren veroeffentlichter Scripts ist fuer alle angemeldeten Benutzer erlaubt.
 - Fehlermeldungen an die UI sind deutsch und enthalten nie den API-Key.

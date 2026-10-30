@@ -12,10 +12,10 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import AppUser, QueryScript, QueryScriptVersion, Role, Run
+from app.models import AppUser, QueryScript, QueryScriptVersion, Role, Run, Workspace
 from app.models.base import utc_now
 from app.models.enums import RunKind, RunMode, RunSource, RunStatus
 from app.scripts.contract import ParamSpec
@@ -151,6 +151,52 @@ def rename_script(session: Session, script: QueryScript, name: str, *, actor: Ap
     script.name = cleaned
     session.flush()
     return cleaned
+
+
+def script_usage(session: Session, script: QueryScript) -> dict[str, int]:
+    """Zaehlt Arbeitsbestaende und Laeufe, die auf Versionen dieses Scripts verweisen."""
+    overview = script_usage_overview(session, script_id=script.id)
+    workspaces, runs = overview.get(script.id, (0, 0))
+    return {"workspaces": workspaces, "runs": runs}
+
+
+def script_usage_overview(
+    session: Session, *, script_id: int | None = None
+) -> dict[int, tuple[int, int]]:
+    """Nutzung je Script (Arbeitsbestaende, Laeufe) in einer Abfrage."""
+    statement = (
+        select(
+            QueryScriptVersion.script_id,
+            func.count(distinct(Workspace.id)),
+            func.count(distinct(Run.id)),
+        )
+        .select_from(QueryScriptVersion)
+        .outerjoin(Workspace, Workspace.script_version_id == QueryScriptVersion.id)
+        .outerjoin(Run, Run.script_version_id == QueryScriptVersion.id)
+        .group_by(QueryScriptVersion.script_id)
+    )
+    if script_id is not None:
+        statement = statement.where(QueryScriptVersion.script_id == script_id)
+    return {
+        int(key): (int(workspaces or 0), int(runs or 0))
+        for key, workspaces, runs in session.execute(statement)
+    }
+
+
+def delete_script(session: Session, script: QueryScript, *, actor: AppUser) -> None:
+    """Loescht ein unbenutztes Script samt Versionen; Vorlagen bleiben erhalten."""
+    if not can_edit_scripts(actor):
+        raise ScriptPermissionError("Kein Recht zum Loeschen von Scripts.")
+    if script.is_template:
+        raise ScriptPermissionError("Vorlagen werden bei Bedarf neu angelegt.")
+    usage = script_usage(session, script)
+    if usage["workspaces"] or usage["runs"]:
+        raise ScriptError(
+            "Das Script wird noch verwendet "
+            f"({usage['workspaces']} Arbeitsbestaende, {usage['runs']} Laeufe)."
+        )
+    session.delete(script)
+    session.flush()
 
 
 def publish_version(
@@ -295,6 +341,7 @@ __all__ = [
     "ScriptPermissionError",
     "can_edit_scripts",
     "create_script",
+    "delete_script",
     "ensure_templates",
     "get_script",
     "interface_for",
@@ -307,4 +354,6 @@ __all__ = [
     "rename_script",
     "run_summary",
     "save_version",
+    "script_usage",
+    "script_usage_overview",
 ]

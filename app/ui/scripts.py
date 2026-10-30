@@ -25,6 +25,7 @@ from app.scripts.runner import ScriptOutcome, ScriptRunner
 from app.scripts.service import (
     can_edit_scripts,
     create_script,
+    delete_script,
     ensure_templates,
     get_script,
     interface_for,
@@ -35,6 +36,7 @@ from app.scripts.service import (
     record_run,
     rename_script,
     save_version,
+    script_usage_overview,
 )
 from app.scripts.templates import TEMPLATES
 from app.ui.guard import current_user, redirect_to_login
@@ -114,21 +116,65 @@ def register_script_pages(
         with session_scope(session_factory) as session:
             ensure_templates(session, owner=session.get(AppUser, user.id))
         status = ui.label("").classes("text-sm")
+        pending: dict[str, Any] = {"delete": None}
+
+        with ui.dialog() as delete_dialog, ui.card().classes("w-[420px] gap-2"):
+            delete_text = ui.label("").classes("text-sm")
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button(t("Abbrechen"), on_click=delete_dialog.close).props("flat dense")
+                delete_confirm = ui.button(t("Löschen")).props("unelevated dense color=negative")
+
+        def _ask_delete(script_id: int, name: str) -> None:
+            pending["delete"] = script_id
+            delete_text.set_text(
+                t("Script '{name}' endgültig löschen? Versionen und Verweise entfallen.", name=name)
+            )
+            delete_dialog.open()
+
+        def _delete_script() -> None:
+            script_id = pending["delete"]
+            if not isinstance(script_id, int):
+                return
+            with session_scope(session_factory) as session:
+                script = session.get(QueryScript, script_id)
+                actor = session.get(AppUser, user.id)
+                if script is None or actor is None:
+                    delete_dialog.close()
+                    return
+                name = script.name
+                try:
+                    delete_script(session, script, actor=actor)
+                except ScriptError as exc:
+                    delete_dialog.close()
+                    status.set_text(t("Fehler: {message}", message=describe_error(exc)))
+                    return
+            pending["delete"] = None
+            delete_dialog.close()
+            status.set_text(t("Script '{name}' gelöscht.", name=name))
+            script_rows.refresh()
+
+        delete_confirm.on_click(_delete_script)
 
         @ui.refreshable
         def script_rows() -> None:
             with session_scope(session_factory) as session:
-                rows = [
-                    {
-                        "id": script.id,
-                        "name": script.name,
-                        "description": script.description or "",
-                        "published": published_version(session, script),
-                        "versions": len(script.versions),
-                        "template": script.is_template,
-                    }
-                    for script in list_scripts(session)
-                ]
+                usage = script_usage_overview(session)
+                rows = []
+                for script in list_scripts(session):
+                    workspaces, runs = usage.get(script.id, (0, 0))
+                    rows.append(
+                        {
+                            "id": script.id,
+                            "name": script.name,
+                            "description": script.description or "",
+                            "published": published_version(session, script),
+                            "versions": len(script.versions),
+                            "template": script.is_template,
+                            "workspaces": workspaces,
+                            "runs": runs,
+                            "used": workspaces + runs,
+                        }
+                    )
             if not rows:
                 ui.label(t("Noch keine Scripts vorhanden.")).classes("text-sm")
                 return
@@ -145,6 +191,16 @@ def register_script_pages(
                     ui.label(version_text).classes("w-32 text-xs")
                     ui.label(t("{count} Versionen", count=row["versions"])).classes("w-24 text-xs")
                     ui.label(t("Vorlage") if row["template"] else "").classes("w-20 text-xs")
+                    usage_text = (
+                        t(
+                            "{workspaces} Bestände, {runs} Läufe",
+                            workspaces=row["workspaces"],
+                            runs=row["runs"],
+                        )
+                        if row["used"]
+                        else t("unbenutzt")
+                    )
+                    ui.label(usage_text).classes("w-44 text-xs")
                     action_button(
                         "edit",
                         t("Öffnen"),
@@ -155,6 +211,14 @@ def register_script_pages(
                             "content_copy",
                             t("Vorlage kopieren"),
                             lambda script_id=int(row["id"]): _copy_template(script_id),
+                        )
+                    if editable and not row["template"] and not row["used"]:
+                        action_button(
+                            "delete",
+                            t("Script löschen"),
+                            lambda script_id=int(row["id"]), name=str(row["name"]): _ask_delete(
+                                script_id, name
+                            ),
                         )
 
         def _copy_template(script_id: int) -> None:

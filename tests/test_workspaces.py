@@ -395,6 +395,24 @@ def test_ansicht_folgt_der_spaltenauswahl(
     ]
 
 
+def test_spaltenauswahl_sortiert_innerhalb_der_gruppen() -> None:
+    from app.ui.workspaces import COLUMN_GROUPS, column_sort_key, grouped_columns
+
+    schema = build_schema(_fields())
+    groups = grouped_columns(schema.columns())
+    assert [source for source, _title in COLUMN_GROUPS] == ["file_attr", "custom", "standard"]
+    for group in groups.values():
+        labels = [column.label for column in group]
+        assert labels == sorted(labels, key=str.casefold)
+    assert [column.label for column in groups["custom"]][:2] == ["Auswahl", "Datum"]
+    umlaut = ColumnDef(key="std:subject", label="Änderung", source="file_attr", edit_type="text")
+    plain = ColumnDef(key="std:subject", label="Bild", source="file_attr", edit_type="text")
+    assert column_sort_key(umlaut) < column_sort_key(plain)
+    assert column_sort_key(umlaut) < column_sort_key(
+        ColumnDef(key="std:subject", label="Zebra", source="file_attr", edit_type="text")
+    )
+
+
 def test_aenderung_setzen_und_zuruecknehmen(
     session: Session, workspace: Workspace, owner: AppUser
 ) -> None:

@@ -26,6 +26,7 @@ from app.scripts.contract import (
 )
 from app.scripts.errors import (
     ScriptContractError,
+    ScriptError,
     ScriptExecutionError,
     ScriptSecurityError,
 )
@@ -40,6 +41,7 @@ from app.scripts.runner import ScriptRunner
 from app.scripts.service import (
     ScriptPermissionError,
     create_script,
+    delete_script,
     ensure_templates,
     interface_for,
     latest_version,
@@ -47,7 +49,9 @@ from app.scripts.service import (
     record_run,
     rename_script,
     save_version,
+    script_usage,
 )
+from app.workspaces import create_workspace
 
 
 class FakeFacade:
@@ -411,6 +415,65 @@ def test_vorlage_kann_nicht_umbenannt_werden(session: Session, editor: AppUser) 
     assert template is not None
     with pytest.raises(ScriptPermissionError, match="Vorlagen"):
         rename_script(session, template, "Eigene Vorlage", actor=editor)
+
+
+def test_unbenutztes_script_wird_geloescht(session: Session, editor: AppUser) -> None:
+    source = "def query(px, params):\n    return [1]\n"
+    script = create_script(session, name="Wegwerf", source=source, actor=editor)
+    script_id = script.id
+    assert script_usage(session, script) == {"workspaces": 0, "runs": 0}
+    delete_script(session, script, actor=editor)
+    assert session.get(QueryScript, script_id) is None
+    assert (
+        session.scalar(select(QueryScriptVersion).where(QueryScriptVersion.script_id == script_id))
+        is None
+    )
+
+
+def test_benutztes_script_wird_nicht_geloescht(
+    session: Session, editor: AppUser, master_key: str
+) -> None:
+    from app.crypto import SecretBox
+    from app.profiles import ProfileData, create_profile
+
+    source = "def query(px, params):\n    return [1]\n"
+    script = create_script(session, name="Im Einsatz", source=source, actor=editor)
+    profile = create_profile(
+        session,
+        SecretBox(master_key),
+        ProfileData(
+            name="script-test", host="demo.px.media", api_key="api-key-mit-32-zeichen-laenge"
+        ),
+        actor=editor,
+    )
+    version = latest_version(session, script)
+    assert version is not None
+    create_workspace(
+        session,
+        owner=editor,
+        profile=profile,
+        name="Bestand",
+        script_version=version,
+    )
+    usage = script_usage(session, script)
+    assert usage["workspaces"] == 1
+    with pytest.raises(ScriptError, match="noch verwendet"):
+        delete_script(session, script, actor=editor)
+    assert session.get(QueryScript, script.id) is not None
+
+
+def test_script_loeschen_prueft_rechte_und_vorlagen(session: Session, editor: AppUser) -> None:
+    source = "def query(px, params):\n    return [1]\n"
+    script = create_script(session, name="Geschuetzt", source=source, actor=editor)
+    viewer = create_user(session, username="leser-delete", password="noch-ein-langes-passwort")
+    with pytest.raises(ScriptPermissionError):
+        delete_script(session, script, actor=viewer)
+    ensure_templates(session, owner=editor)
+    template = session.scalar(select(QueryScript).where(QueryScript.is_template.is_(True)))
+    assert template is not None
+    with pytest.raises(ScriptPermissionError, match="Vorlagen"):
+        delete_script(session, template, actor=editor)
+    assert session.get(QueryScript, script.id) is not None
 
 
 def test_vorlagen_werden_angelegt_und_sind_unveraenderlich(

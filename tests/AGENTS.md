@@ -20,17 +20,18 @@
 - `test_bench.py`: synthetische Daten, SQL auf dem effektiven Stand (Aenderung gewinnt,
   Leeren faellt nicht auf den Snapshot zurueck) und ein kleiner Lastnachweis.
 - `test_profiles.py`: Profile (Verschluesselung, Namenspruefung, Key-Rotation, Audit),
-  Verbindungstest und `ClientFactory`-Cache; `current_user_name` und `response_mapping`
-  laufen gegen nachgebaute Client-Antworten.
+  Verbindungstest, Loeschen (nur Superuser, unbenutzt, Audit, Benutzerzuordnung entfaellt)
+  und `ClientFactory`-Cache; `current_user_name` und `response_mapping` laufen gegen
+  nachgebaute Client-Antworten.
 - `test_scripts.py`: Script-Vertrag (`PARAMS`, `COLUMNS`, Filter, Ergebnisse),
   RestrictedPython-Abweisungen, Fassade gegen einen nachgebauten Client, Versionierung,
-  Umbenennen (Name, Rechte, Vorlagen, keine neue Version) und Vorlagen sowie der
-  Kindprozess mit Zeitlimit.
+  Umbenennen (Name, Rechte, Vorlagen, keine neue Version), Loeschen (nur unbenutzt, keine
+  Vorlage, Rechte) und Vorlagen sowie der Kindprozess mit Zeitlimit.
 - `test_workspaces.py`: Normalisierung (Texte exakt, Datum/Zahl/Boolean/Auswahl),
   Schemaaufloesung und SchemaCache, Arbeitsbestaende (Snapshot, ChangeSet, Revision,
   effektive Seiten mit Filter/Sortierung, Massenaktionen, Ablauf), die Spaltenauswahl
-  (Speichern, Obergrenze, erhaltene Script-Parameter, Ansicht folgt der Auswahl) und der
-  Loader gegen einen nachgebauten Client.
+  (Speichern, Obergrenze, erhaltene Script-Parameter, Ansicht folgt der Auswahl, sortierte
+  Gruppen) und der Loader gegen einen nachgebauten Client.
 - `test_i18n.py`: Vollstaendigkeit des englischen Katalogs (jeder `t(...)`-Text muss
   uebersetzt sein), Platzhalterformatierung, Sprachumschaltung und Rueckfall auf Deutsch.
 - `test_writeplan.py`: Schreibplan aus dem ChangeSet (filesPut-Felder, Abschneiden leerer

@@ -49,6 +49,12 @@
 - Der Verbindungstest laeuft ueber `asyncio` (`run.io_bound`) und schreibt das Ergebnis
   mit `record_connection_check` (Audit inklusive).
 - Aktionen in Listen sind Icon-Buttons mit Tooltip und `aria-label`.
+- Loeschaktionen fragen in einem Dialog nach (Name und Folge im Text) und erscheinen nur,
+  wenn der Datensatz unbenutzt ist: `/scripts` zeigt je Zeile die Nutzung und blendet
+  "Script loeschen" fuer Vorlagen und benutzte Scripts aus, `/admin/profiles` ebenso fuer
+  Profile mit Arbeitsbestaenden oder Laeufen. Nach dem Loeschen wird das Refreshable
+  erneuert; bei Profilen zusaetzlich `ClientFactory.invalidate` und `clear_form`, falls
+  das geloeschte Profil im Formular lag.
 - Jeder sichtbare Text läuft über `t(...)`; deutsche Quelltexte mit Umlauten, englische
   Übersetzung in `app/i18n.py`. Keine Textbutton-Beschriftungen für Aktionen.
 - Die Sprache wird pro Session gespeichert (`locale` in `app.storage.user`) und über
@@ -109,6 +115,9 @@
   `set_visibility` aus, "Alle" waehlt nur sichtbare Felder bis `MAX_SELECTED_COLUMNS`,
   "Uebernehmen" ruft `store_columns` und laedt die Seite neu (`ui.navigate.reload`),
   "Zuruecksetzen" ruft `clear_columns`.
+- `grouped_columns` sortiert je Gruppe nach Anzeigename (`column_sort_key`: Umlaute
+  zaehlen wie ihr Grundbuchstabe, danach `casefold`). Die gespeicherte Reihenfolge ist die
+  Reihenfolge im Dialog, damit Grid und Excel-Export dieselbe Sortierung zeigen.
 
 ## Work Guidance
 
@@ -135,7 +144,8 @@
   sichtbar. Mit einer extern geaenderten Datei muss der Lauf ohne Bestaetigung blockieren.
 - Spaltenauswahl: "Spalten auswaehlen" oeffnen, Feldfilter nutzen, "Alle"/"Keine",
   "Uebernehmen" und "Zuruecksetzen" pruefen; das Grid zeigt danach genau die gewaehlten
-  Spalten, und die Auswahl ueberlebt ein Neuladen der Seite.
+  Spalten (in der Reihenfolge des Dialogs, je Gruppe alphabetisch), und die Auswahl
+  ueberlebt ein Neuladen der Seite.
 - Excel: im Grid exportieren, in der Arbeitsmappe eine Zelle aendern, ueber `/workspaces`
   importieren; der neue Arbeitsbestand zeigt genau diese Aenderung, und die Review-Seite
   schreibt sie mit `run.source = xlsx`.

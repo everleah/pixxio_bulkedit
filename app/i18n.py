@@ -21,6 +21,16 @@ LOCALE_STORAGE_KEY = "locale"
 
 # Englische Übersetzungen; Schlüssel ist der deutsche Quelltext.
 EN_TRANSLATIONS: dict[str, str] = {
+    # Loeschen von Scripts und Profilen
+    "Löschen": "Delete",
+    "Profil '{name}' endgültig löschen? API-Key und Zuordnungen entfallen.": "Delete profile '{name}' permanently? API key and assignments will be removed.",
+    "Profil '{name}' gelöscht.": "Profile '{name}' deleted.",
+    "Profil löschen": "Delete profile",
+    "Script '{name}' endgültig löschen? Versionen und Verweise entfallen.": "Delete script '{name}' permanently? Versions and references will be removed.",
+    "Script '{name}' gelöscht.": "Script '{name}' deleted.",
+    "Script löschen": "Delete script",
+    "unbenutzt": "unused",
+    "{workspaces} Bestände, {runs} Läufe": "{workspaces} workspaces, {runs} runs",
     # Script umbenennen
     "Script heißt jetzt '{name}'.": "Script is now called '{name}'.",
     "Speichern (Name und neue Version)": "Save (name and new version)",

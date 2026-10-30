@@ -10,11 +10,11 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.crypto import SecretBox, api_key_hint
-from app.models import AdminAudit, AppUser, Profile, utc_now
+from app.models import AdminAudit, AppUser, Profile, Role, Run, Workspace, utc_now
 
 MIN_API_KEY_LENGTH = 8
 
@@ -184,3 +184,49 @@ def record_connection_check(
         target=profile.name,
         details={"ok": ok, "user": pixxio_user},
     )
+
+
+def profile_usage_overview(session: Session) -> dict[int, tuple[int, int]]:
+    """Nutzung je Profil (Arbeitsbestaende, Laeufe) in zwei Abfragen."""
+    workspaces: dict[int, int] = {}
+    for key, count in session.execute(
+        select(Workspace.profile_id, func.count(Workspace.id)).group_by(Workspace.profile_id)
+    ):
+        workspaces[int(key)] = int(count or 0)
+    runs: dict[int, int] = {}
+    for key, count in session.execute(
+        select(Run.profile_id, func.count(Run.id))
+        .where(Run.profile_id.is_not(None))
+        .group_by(Run.profile_id)
+    ):
+        if key is not None:
+            runs[int(key)] = int(count or 0)
+    return {
+        profile_id: (workspaces.get(profile_id, 0), runs.get(profile_id, 0))
+        for profile_id in set(workspaces) | set(runs)
+    }
+
+
+def profile_usage(session: Session, profile: Profile) -> dict[str, int]:
+    """Zaehlt Arbeitsbestaende und Laeufe eines Profils."""
+    workspaces, runs = profile_usage_overview(session).get(profile.id, (0, 0))
+    return {"workspaces": workspaces, "runs": runs}
+
+
+def delete_profile(session: Session, profile: Profile, *, actor: AppUser | None) -> dict[str, str]:
+    """Loescht ein unbenutztes Profil; die Zuordnung zu Benutzern entfaellt mit."""
+    if actor is None or actor.role is not Role.SUPERUSER:
+        raise ProfileError("Nur Superuser duerfen Profile loeschen.")
+    usage = profile_usage(session, profile)
+    if usage["workspaces"] or usage["runs"]:
+        raise ProfileError(
+            "Das Profil wird noch verwendet "
+            f"({usage['workspaces']} Arbeitsbestaende, {usage['runs']} Laeufe); "
+            "stattdessen deaktivieren."
+        )
+    name = profile.name
+    host = profile.host
+    session.delete(profile)
+    session.flush()
+    _audit(session, actor=actor, action="profile.delete", target=name, details={"host": host})
+    return {"name": name, "host": host}

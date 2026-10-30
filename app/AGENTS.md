@@ -46,7 +46,9 @@
   Stand (Drei-Wege) und legen daraus einen neuen Arbeitsbestand mit ChangeSet an.
   `purge_exports` haelt die Aufbewahrungsfrist ein.
 - `profiles.py`: Profile anlegen und aendern (API-Key verschluesselt, Hint statt Key),
-  Verbindungstest protokollieren, Host normalisieren; schreibt `AdminAudit`-Eintraege.
+  Verbindungstest protokollieren, Host normalisieren, Nutzung zaehlen (`profile_usage`)
+  und unbenutzte Profile loeschen (`delete_profile`, nur Superuser); schreibt
+  `AdminAudit`-Eintraege.
 - `clients.py`: `ClientFactory` haelt je Profil einen pixx.io-Client, ent- und
   verschluesselt den Key nur dort und liefert `current_user_name` fuer Verbindungstests;
   `writer_client_for` liefert einen Client ohne automatische PUT-Wiederholungen.
@@ -113,6 +115,13 @@
   fuer die Laufuebersicht erhalten. Aufruf ueber `python -m app purge-history` oder die
   Schaltflaeche in `/runs`. Derselbe Aufruf entfernt Export-Snapshots nach
   `EXPORT_TTL_DAYS` (90) Tagen ueber `purge_exports`.
+- Loeschen ist nur ohne Verwendung erlaubt: `delete_script` verlangt `can_edit_scripts`,
+  lehnt Vorlagen ab und prueft `script_usage` (Arbeitsbestaende und Laeufe ueber die
+  Versionen, per `count(distinct)`); `delete_profile` verlangt die Superuser-Rolle und
+  prueft `profile_usage` (Arbeitsbestaende und Laeufe). `workspace.profile_id` ist
+  `RESTRICT`, die uebrigen Verweise sind `SET NULL` — die Pruefung im Service ist deshalb
+  Pflicht, damit kein Protokoll seinen Bezug verliert. Beide Loeschungen landen im
+  `AdminAudit` (Profil) beziehungsweise entfernen die Versionen per `CASCADE`.
 - Excel-Export liest ausschliesslich den Snapshot (`workspace_asset`), nie den effektiven
   Stand: ungeschriebene Grid-Aenderungen werden nicht exportiert, der Export vermerkt sie
   nur (`pending_changes`/`hinweis` im Blatt `Info`). Zeile 1 haelt technische Schluessel,

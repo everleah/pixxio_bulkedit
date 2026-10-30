@@ -7,6 +7,7 @@ zurueck ins Eingabefeld. Jede Seite prueft die Rolle serverseitig.
 from __future__ import annotations
 
 from functools import partial
+from typing import Any
 
 from nicegui import run, ui
 from pixxio_client.exceptions import PIXXIOException
@@ -30,6 +31,8 @@ from app.profiles import (
     ProfileData,
     ProfileError,
     create_profile,
+    delete_profile,
+    profile_usage_overview,
     record_connection_check,
     update_profile,
 )
@@ -110,42 +113,111 @@ def register_admin_pages(
                 active_switch = ui.switch(t("aktiv"), value=True)
             buttons = ui.row().classes("gap-1")
 
-        @ui.refreshable
-        def profile_rows() -> None:
-            with session_scope(session_factory) as session:
-                rows = [
-                    {
-                        "id": profile.id,
-                        "name": profile.name,
-                        "host": profile.host,
-                        "hint": profile.api_key_hint,
-                        "max_rows": profile.max_rows,
-                        "allow_write": profile.allow_write,
-                        "active": profile.is_active,
-                        "check": _check_label(profile),
-                    }
-                    for profile in session.scalars(select(Profile).order_by(Profile.name))
-                ]
-            if not rows:
-                ui.label(t("Noch keine Profile angelegt.")).classes("text-sm")
-                return
-            for row in rows:
-                with ui.row().classes(ROW_CLASSES):
-                    ui.label(row["name"]).classes("w-40 font-medium")
-                    ui.label(row["host"]).classes("w-44")
-                    ui.label(str(row["hint"])).classes("w-24")
-                    ui.label(t("max. {rows}", rows=row["max_rows"])).classes("w-24")
-                    ui.label(t("Schreiben") if row["allow_write"] else t("nur lesen")).classes(
-                        "w-24"
+            profile_pending: dict[str, Any] = {"delete": None}
+
+            with ui.dialog() as profile_delete_dialog, ui.card().classes("w-[440px] gap-2"):
+                profile_delete_text = ui.label("").classes("text-sm")
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button(t("Abbrechen"), on_click=profile_delete_dialog.close).props(
+                        "flat dense"
                     )
-                    ui.label(t("aktiv") if row["active"] else t("inaktiv")).classes("w-16")
-                    ui.label(str(row["check"])).classes("w-56 text-xs")
-                    action_button("edit", t("Bearbeiten"), partial(load, int(row["id"])))
-                    action_button(
-                        "network_check",
-                        t("Verbindung testen"),
-                        partial(check, int(row["id"])),
+                    profile_delete_confirm = ui.button(t("Löschen")).props(
+                        "unelevated dense color=negative"
                     )
+
+            def _ask_delete_profile(profile_id: int, name: str) -> None:
+                profile_pending["delete"] = profile_id
+                profile_delete_text.set_text(
+                    t(
+                        "Profil '{name}' endgültig löschen? API-Key und Zuordnungen entfallen.",
+                        name=name,
+                    )
+                )
+                profile_delete_dialog.open()
+
+            def _delete_profile_now() -> None:
+                profile_id = profile_pending["delete"]
+                if not isinstance(profile_id, int):
+                    return
+                with session_scope(session_factory) as session:
+                    profile = session.get(Profile, profile_id)
+                    actor = session.get(AppUser, user.id)
+                    if profile is None:
+                        profile_delete_dialog.close()
+                        return
+                    name = profile.name
+                    try:
+                        delete_profile(session, profile, actor=actor)
+                    except ProfileError as exc:
+                        profile_delete_dialog.close()
+                        status.set_text(t("Fehler: {message}", message=describe_error(exc)))
+                        return
+                profile_pending["delete"] = None
+                profile_delete_dialog.close()
+                client_factory.invalidate(profile_id)
+                status.set_text(t("Profil '{name}' gelöscht.", name=name))
+                if editing["id"] == profile_id:
+                    clear_form()
+                profile_rows.refresh()
+
+            profile_delete_confirm.on_click(_delete_profile_now)
+
+            @ui.refreshable
+            def profile_rows() -> None:
+                with session_scope(session_factory) as session:
+                    usage = profile_usage_overview(session)
+                    rows = [
+                        {
+                            "id": profile.id,
+                            "name": profile.name,
+                            "host": profile.host,
+                            "hint": profile.api_key_hint,
+                            "max_rows": profile.max_rows,
+                            "allow_write": profile.allow_write,
+                            "active": profile.is_active,
+                            "check": _check_label(profile),
+                            "workspaces": usage.get(profile.id, (0, 0))[0],
+                            "runs": usage.get(profile.id, (0, 0))[1],
+                        }
+                        for profile in session.scalars(select(Profile).order_by(Profile.name))
+                    ]
+                if not rows:
+                    ui.label(t("Noch keine Profile angelegt.")).classes("text-sm")
+                    return
+                for row in rows:
+                    used = bool(row["workspaces"] or row["runs"])
+                    with ui.row().classes(ROW_CLASSES):
+                        ui.label(row["name"]).classes("w-40 font-medium")
+                        ui.label(row["host"]).classes("w-44")
+                        ui.label(str(row["hint"])).classes("w-24")
+                        ui.label(t("max. {rows}", rows=row["max_rows"])).classes("w-24")
+                        ui.label(t("Schreiben") if row["allow_write"] else t("nur lesen")).classes(
+                            "w-24"
+                        )
+                        ui.label(t("aktiv") if row["active"] else t("inaktiv")).classes("w-16")
+                        usage_text = (
+                            t(
+                                "{workspaces} Bestände, {runs} Läufe",
+                                workspaces=row["workspaces"],
+                                runs=row["runs"],
+                            )
+                            if used
+                            else t("unbenutzt")
+                        )
+                        ui.label(usage_text).classes("w-40 text-xs")
+                        ui.label(str(row["check"])).classes("w-56 text-xs")
+                        action_button("edit", t("Bearbeiten"), partial(load, int(row["id"])))
+                        action_button(
+                            "network_check",
+                            t("Verbindung testen"),
+                            partial(check, int(row["id"])),
+                        )
+                        if not used:
+                            action_button(
+                                "delete",
+                                t("Profil löschen"),
+                                partial(_ask_delete_profile, int(row["id"]), str(row["name"])),
+                            )
 
         def load(profile_id: int) -> None:
             with session_scope(session_factory) as session:

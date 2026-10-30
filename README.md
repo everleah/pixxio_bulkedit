@@ -104,7 +104,9 @@ rotiert damit auch den Key.
 Weitere Profile, Benutzer und Rechte verwaltet ein Superuser unter `/admin/profiles` und
 `/admin/users`. Der gespeicherte Key wird dort nur als Hint (`••••abcd`) angezeigt; ein
 leeres Key-Feld behaelt den bisherigen Key. "Verbindung testen" meldet den API-Benutzer
-und protokolliert das Ergebnis im Admin-Audit.
+und protokolliert das Ergebnis im Admin-Audit. Die Profilliste zeigt die Nutzung
+(„12 Bestände, 17 Läufe" oder „unbenutzt"); nur unbenutzte Profile lassen sich löschen,
+benutzte stattdessen deaktivieren.
 
 ## Abfrage-Scripts
 
@@ -147,6 +149,13 @@ Version)" uebernommen. Aendert sich nur der Name, entsteht dabei **keine** neue 
 Vorlagen und Leser sehen das Feld gesperrt. So laesst sich eine Kopie (`Vorlage kopieren`
 erzeugt „… (Kopie)") anschliessend passend benennen.
 
+Loeschen: Die Liste zeigt je Script die Nutzung („2 Bestaende, 8 Laeufe" oder
+„unbenutzt"). Nur unbenutzte, eigene Scripts bekommen einen Loeschknopf mit
+Bestaetigungsdialog; Versionen werden mitgeloescht. Vorlagen bleiben erhalten (sie werden
+bei Bedarf neu angelegt), und Scripts mit Arbeitsbestaenden oder Laeufen bleiben als
+Protokoll bestehen. Profile lassen sich ebenso loeschen, solange kein Arbeitsbestand und
+kein Lauf darauf verweist — sonst hilft nur „inaktiv" schalten.
+
 Filter folgen der pixx.io-API: Verknuepfungen ueber `px.filters.and_(...)`/`or_(...)`
 (`connectorAnd`/`connectorOr`), Negation ueber `px.filters.not_(...)` (`inverted`).
 Metadatenfilter (`metadata_text`, `metadata_selection`, `metadata_date`,
@@ -164,11 +173,12 @@ Namen vor dem Senden auf.
   zu zwölf Custom-Felder.
 - „Spalten auswählen" (Icon `view_column`) öffnet die Spaltenauswahl: alle Felder des
   Profils in drei Gruppen (Standardattribute, eigene Metadatenfelder,
-  Standard-Metadatenfelder), mit Feldfilter, Zähler und den Schaltflächen „Alle",
-  „Keine", „Zurücksetzen" und „Übernehmen". Die Auswahl gilt nur für diesen
-  Arbeitsbestand, wird in `params_json` gespeichert (höchstens 80 Spalten) und wirkt
-  auch auf Filter, Sortierung und Excel-Export. „Zurücksetzen" stellt die
-  Script- beziehungsweise Standardspalten wieder her.
+  Standard-Metadatenfelder), **innerhalb der Gruppe alphabetisch sortiert**, mit
+  Feldfilter, Zähler und den Schaltflächen „Alle", „Keine", „Zurücksetzen" und
+  „Übernehmen". Die Auswahl gilt nur für diesen Arbeitsbestand, wird in `params_json`
+  gespeichert (höchstens 80 Spalten) und wirkt auch auf Filter, Sortierung und
+  Excel-Export. „Zurücksetzen" stellt die Script- beziehungsweise Standardspalten wieder
+  her; die Spaltenreihenfolge im Grid folgt der Reihenfolge im Dialog.
 
   > Hinweis: Ein Profil kann sehr viele Standard-Metadatenfelder mitbringen (im
   > Testsystem rund 390). Ohne Feldfilter ist die Liste lang; „Alle" wählt dann nur bis

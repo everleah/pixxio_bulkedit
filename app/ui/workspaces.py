@@ -8,6 +8,7 @@ schreibt die Seite direkt in den ChangeSet.
 from __future__ import annotations
 
 import json
+import unicodedata
 from collections.abc import Sequence
 from typing import Any
 
@@ -78,6 +79,12 @@ BLOCK_SIZE = 100
 MAX_BLOCK_SIZE = 500
 DEFAULT_COLUMNS = ("std:fileName", "std:subject", "std:description")
 DEFAULT_CUSTOM_COLUMNS = 12
+# Gruppen der Spaltenauswahl: Quelle und deutscher Quelltext des Gruppentitels.
+COLUMN_GROUPS: tuple[tuple[str, str], ...] = (
+    ("file_attr", "Standardattribute"),
+    ("custom", "Eigene Metadatenfelder"),
+    ("standard", "Standard-Metadatenfelder"),
+)
 ROW_CLASSES = "w-full items-center gap-3 border-b py-1 text-sm"
 MIN_COLUMN_WIDTH = 80
 EDITABLE_EDIT_TYPES = frozenset(
@@ -233,6 +240,22 @@ def _column_for(columns: Sequence[ColumnDef], key: object) -> ColumnDef | None:
     if not isinstance(key, str):
         return None
     return next((column for column in columns if column.key == key), None)
+
+
+def column_sort_key(column: ColumnDef) -> tuple[str, str]:
+    """Sortierschluessel fuer Anzeigenamen; Umlaute zaehlen wie ihr Grundbuchstabe."""
+    plain = unicodedata.normalize("NFKD", column.label).encode("ascii", "ignore").decode("ascii")
+    return plain.casefold(), column.label.casefold()
+
+
+def grouped_columns(columns: Sequence[ColumnDef]) -> dict[str, list[ColumnDef]]:
+    """Spalten je Gruppe, innerhalb der Gruppe nach Anzeigename sortiert."""
+    return {
+        source: sorted(
+            (column for column in columns if column.source == source), key=column_sort_key
+        )
+        for source, _title in COLUMN_GROUPS
+    }
 
 
 def workspace_columns(
@@ -895,15 +918,12 @@ def register_workspace_pages(
         state: dict[str, Any] = {"filter": "", "filterKey": "", "onlyChanged": False}
 
         all_columns = schema.columns()
+        groups = grouped_columns(all_columns)
+        dialog_columns = [column for source, _title in COLUMN_GROUPS for column in groups[source]]
         selected_keys = {column.key for column in columns}
         checked: dict[str, Any] = {}
         visible_keys: set[str] = set()
         built = {"done": False, "bulk": False}
-        column_groups = (
-            ("file_attr", t("Standardattribute")),
-            ("custom", t("Eigene Metadatenfelder")),
-            ("standard", t("Standard-Metadatenfelder")),
-        )
 
         with ui.dialog() as column_dialog, ui.card().classes("w-[560px] gap-2"):
             ui.label(t("Spalten auswählen")).classes("font-semibold text-base")
@@ -935,11 +955,11 @@ def register_workspace_pages(
                 return
             built["done"] = True
             with column_list:
-                for source, title in column_groups:
-                    group = [column for column in all_columns if column.source == source]
+                for source, title in COLUMN_GROUPS:
+                    group = groups[source]
                     if not group:
                         continue
-                    ui.label(title).classes("text-xs font-semibold mt-1")
+                    ui.label(t(title)).classes("text-xs font-semibold mt-1")
                     for column in group:
                         label = column.label
                         if not column.writable:
@@ -952,7 +972,7 @@ def register_workspace_pages(
         def _chosen_keys() -> list[str]:
             return [
                 column.key
-                for column in all_columns
+                for column in dialog_columns
                 if column.key in checked and checked[column.key].value
             ]
 
@@ -974,7 +994,7 @@ def register_workspace_pages(
                 return
             term = str(column_filter.value or "").strip().lower()
             visible_keys.clear()
-            for column in all_columns:
+            for column in dialog_columns:
                 hit = not term or term in column.label.lower() or term in column.key.lower()
                 checked[column.key].set_visibility(hit)
                 if hit:
@@ -989,7 +1009,7 @@ def register_workspace_pages(
                     return
                 chosen = len(_chosen_keys())
                 skipped = 0
-                for column in all_columns:
+                for column in dialog_columns:
                     widget = checked.get(column.key)
                     if widget is None or column.key not in visible_keys or widget.value:
                         continue

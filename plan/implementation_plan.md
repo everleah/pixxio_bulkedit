@@ -269,6 +269,7 @@ vor Phase 2 entschieden.
 - Serverseitige Berechtigungspruefung bei jeder relevanten Aktion.
 - API-Keys verschluesselt, ausschliesslich serverseitig verfuegbar.
 - Schutz des letzten aktiven Superusers.
+- Unbenutzte Profile loeschen, benutzte nur deaktivieren (Nutzung sichtbar in der Liste).
 
 Umgesetzt (Oktober 2026): `app/profiles.py` (Anlegen/Aendern inklusive Key-Rotation,
 Verbindungstest, Admin-Audit), `app/clients.py` (`ClientFactory` je Profil mit Cache und
@@ -285,6 +286,8 @@ verpflichtend; das verbleibende Risiko wird dokumentiert.
 - Editor, unveraenderliche Versionen und Veroeffentlichung.
 - Namen im Editor aendern (auch fuer Kopien von Vorlagen); reines Umbenennen erzeugt
   keine neue Version, Vorlagen bleiben gesperrt.
+- Unbenutzte Scripts loeschen; Vorlagen und Scripts mit Arbeitsbestaenden oder Laeufen
+  bleiben erhalten.
 - Nur Superuser duerfen erstellen, aendern oder unveroeffentlichte Entwuerfe testen.
 - Andere Benutzer fuehren ausschliesslich veroeffentlichte Versionen aus.
 - Lesende Fassade mit validierten Ergebnissen.

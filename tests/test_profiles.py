@@ -146,6 +146,76 @@ def test_verbindungstest_wird_protokolliert(
     assert audit is not None
 
 
+def test_unbenutztes_profil_wird_geloescht(
+    session: Session, box: SecretBox, actor: AppUser
+) -> None:
+    from app.models import UserProfile
+    from app.profiles import delete_profile, profile_usage
+
+    profile = create_profile(session, box, _data(), actor=actor)
+    session.add(UserProfile(user_id=actor.id, profile_id=profile.id))
+    session.flush()
+    profile_id = profile.id
+    assert profile_usage(session, profile) == {"workspaces": 0, "runs": 0}
+
+    delete_profile(session, profile, actor=actor)
+
+    assert session.get(Profile, profile_id) is None
+    assert session.scalar(select(UserProfile).where(UserProfile.profile_id == profile_id)) is None
+    audit = session.scalar(
+        select(AdminAudit)
+        .where(AdminAudit.action == "profile.delete")
+        .order_by(AdminAudit.id.desc())
+    )
+    assert audit is not None
+    assert audit.target == "Testsystem"
+
+
+def test_benutztes_profil_wird_nicht_geloescht(
+    session: Session, box: SecretBox, actor: AppUser
+) -> None:
+    from app.models import Run
+    from app.models.enums import RunKind, RunMode, RunSource, RunStatus
+    from app.profiles import delete_profile, profile_usage
+    from app.workspaces import create_workspace
+
+    profile = create_profile(session, box, _data(), actor=actor)
+    create_workspace(session, owner=actor, profile=profile, name="Bestand")
+    assert profile_usage(session, profile)["workspaces"] == 1
+    with pytest.raises(ProfileError, match="Arbeitsbestaende|Arbeitsbestände"):
+        delete_profile(session, profile, actor=actor)
+    assert session.get(Profile, profile.id) is not None
+
+    second = create_profile(session, box, _data(name="Zweites"), actor=actor)
+    session.add(
+        Run(
+            kind=RunKind.QUERY,
+            mode=RunMode.DRY_RUN,
+            source=RunSource.GRID,
+            status=RunStatus.OK,
+            profile_id=second.id,
+        )
+    )
+    session.flush()
+    assert profile_usage(session, second)["runs"] == 1
+    with pytest.raises(ProfileError):
+        delete_profile(session, second, actor=actor)
+
+
+def test_profil_loeschen_braucht_superuser(
+    session: Session, box: SecretBox, actor: AppUser
+) -> None:
+    from app.profiles import delete_profile
+
+    profile = create_profile(session, box, _data(), actor=actor)
+    editor = AppUser(username="editor", password_hash="x", role=Role.EDITOR)
+    session.add(editor)
+    session.flush()
+    with pytest.raises(ProfileError, match="Superuser"):
+        delete_profile(session, profile, actor=editor)
+    assert session.get(Profile, profile.id) is not None
+
+
 def test_client_factory_cached_und_invalidiert(
     box: SecretBox, session: Session, actor: AppUser
 ) -> None:
