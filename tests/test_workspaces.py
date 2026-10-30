@@ -46,6 +46,7 @@ from app.workspaces import (
     create_workspace,
     effective_page,
     expiry_warning_days,
+    file_values,
     load_assets,
     resolve_targets,
     revert_change,
@@ -199,6 +200,38 @@ def test_unbekannte_spalten_werden_gemeldet() -> None:
     columns, unknown = resolve_columns(schema, ["custom:Gibt es nicht", "std:unbekannt", "x:1"])
     assert columns == []
     assert unknown == ["custom:Gibt es nicht", "std:unbekannt", "x:1"]
+
+
+def test_dateistatus_bringt_optionen_mit() -> None:
+    schema = build_schema(_fields(), [{"id": 371896184, "name": "neu"}, {"id": 1872385346}])
+    column = schema.file_attr_column("fileStateID", "selection")
+
+    assert column.options == ("neu",)
+    assert column.option_ids == ((371896184, "neu"),)
+    keys = [item.key for item in schema.columns()]
+    assert "std:fileStateID" in keys
+    resolved, unknown = resolve_columns(schema, ["std:fileStateID"])
+    assert unknown == []
+    assert resolved[0].option_ids == ((371896184, "neu"),)
+
+
+def test_dateistatus_wird_aus_file_state_gelesen() -> None:
+    payload = {
+        "id": 7,
+        "fileState": {"id": 1872385346},
+        "metadataFields": {},
+    }
+    column = ColumnDef(
+        key="std:fileStateID",
+        label="Dateistatus",
+        source="file_attr",
+        edit_type="selection",
+        options=("neu", "gesperrt"),
+        option_ids=((371896184, "neu"), (1872385346, "gesperrt")),
+    )
+
+    assert file_values(payload, [column]) == {"std:fileStateID": "gesperrt"}
+    assert file_values({"id": 8}, [column]) == {"std:fileStateID": None}
 
 
 def test_optionen_und_schreibbarkeit() -> None:

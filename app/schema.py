@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from pixxio_client import Client
+from pixxio_client.filestates import FileState
 from pixxio_client.metadata import CustomMetadata, StandardMetadata
 
 from app.clients import response_mapping
@@ -22,6 +23,7 @@ from app.scripts.errors import ScriptExecutionError
 
 CUSTOM_PAGE_SIZE = 50
 STANDARD_PAGE_SIZE = 100
+FILE_STATE_PAGE_SIZE = 50
 FIELD_LIMIT = 5_000
 FIELD_RESPONSE_FIELDS = ["id", "name", "editType", "selectionOptions"]
 DEFAULT_TTL_SECONDS = 900
@@ -86,18 +88,30 @@ class ProfileSchema:
     custom: tuple[MetadataField, ...] = ()
     standard: tuple[MetadataField, ...] = ()
     file_attrs: tuple[str, ...] = field(default_factory=lambda: tuple(FILE_ATTRS))
+    file_states: tuple[tuple[int, str], ...] = ()
 
     def by_key(self, key: str) -> ColumnDef | None:
         return next((column for column in self.columns() if column.key == key), None)
 
+    def file_attr_column(self, name: str, edit_type: str) -> ColumnDef:
+        """Spalte eines Standardattributs; der Dateistatus bringt seine Optionen mit."""
+        options: tuple[str, ...] = ()
+        option_ids: tuple[tuple[int, str], ...] = ()
+        if name == "fileStateID" and self.file_states:
+            option_ids = self.file_states
+            options = tuple(label for _state_id, label in option_ids)
+        return ColumnDef(
+            key=f"std:{name}",
+            label=FILE_ATTRS[name][0],
+            source="file_attr",
+            edit_type=edit_type,
+            options=options,
+            option_ids=option_ids,
+        )
+
     def columns(self) -> list[ColumnDef]:
         columns = [
-            ColumnDef(
-                key=f"std:{name}",
-                label=FILE_ATTRS[name][0],
-                source="file_attr",
-                edit_type=FILE_ATTRS[name][1],
-            )
+            self.file_attr_column(name, FILE_ATTRS[name][1])
             for name in self.file_attrs
             if name in FILE_ATTRS
         ]
@@ -174,13 +188,35 @@ def fetch_metadata_fields(client: Client) -> list[dict[str, Any]]:
     return fields
 
 
-def build_schema(fields: list[dict[str, Any]]) -> ProfileSchema:
+def fetch_file_states(client: Client) -> list[dict[str, Any]]:
+    """Liest die Dateistatus-Werte (ID und Name) des Mandanten."""
+    states = FileState(client)
+    return [response_mapping(item) for item in states.iter_all(page_size=FILE_STATE_PAGE_SIZE)]
+
+
+def build_schema(
+    fields: list[dict[str, Any]], file_states: list[dict[str, Any]] | None = None
+) -> ProfileSchema:
     """Baut das Profilschema aus gelesenen Felddefinitionen."""
     custom = tuple(_as_field("custom", item) for item in fields if item.get("kind") == "custom")
     standard = tuple(
         _as_field("standard", item) for item in fields if item.get("kind") == "standard"
     )
-    return ProfileSchema(custom=custom, standard=standard)
+    return ProfileSchema(
+        custom=custom,
+        standard=standard,
+        file_states=_state_options(file_states or []),
+    )
+
+
+def _state_options(states: list[dict[str, Any]]) -> tuple[tuple[int, str], ...]:
+    pairs: list[tuple[int, str]] = []
+    for state in states:
+        state_id = state.get("id")
+        name = str(state.get("name", "")).strip()
+        if isinstance(state_id, int) and name:
+            pairs.append((state_id, name))
+    return tuple(pairs)
 
 
 def resolve_columns(
@@ -209,12 +245,7 @@ def _resolve_one(schema: ProfileSchema, prefix: str, value: str) -> ColumnDef | 
     if prefix == "std":
         if value not in FILE_ATTRS:
             return None
-        return ColumnDef(
-            key=f"std:{value}",
-            label=FILE_ATTRS[value][0],
-            source="file_attr",
-            edit_type=FILE_ATTRS[value][1],
-        )
+        return schema.file_attr_column(value, FILE_ATTRS[value][1])
     if prefix not in {"custom", "standard"}:
         return None
     fields = schema.custom if prefix == "custom" else schema.standard
@@ -284,7 +315,7 @@ class SchemaCache:
 def _load_from_api(profile: Profile, api_key: str) -> ProfileSchema:
     try:
         client = Client.create_client(api_key, profile.host, max_retries=profile.max_retries)
-        return build_schema(fetch_metadata_fields(client))
+        return build_schema(fetch_metadata_fields(client), fetch_file_states(client))
     except Exception as exc:  # noqa: BLE001 - Clientfehler in ScriptError uebersetzen
         raise ScriptExecutionError(f"Schema konnte nicht geladen werden: {exc}") from exc
 
@@ -296,6 +327,7 @@ __all__ = [
     "ProfileSchema",
     "SchemaCache",
     "build_schema",
+    "fetch_file_states",
     "fetch_metadata_fields",
     "resolve_columns",
 ]

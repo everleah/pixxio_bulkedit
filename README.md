@@ -191,6 +191,26 @@ schreibt erst nach Dry Run und Bestätigung.
 - Nach vollständigem Erfolg wandern die geschriebenen Werte in den Snapshot und
   verschwinden aus dem Entwurf; `run` und `change_log` bleiben als Protokoll (Grundlage
   für Audit und Undo).
+- Der Dateistatus (`std:fileStateID`) wird als Auswahlliste angeboten; ein Statuswechsel
+  verlangt im Review einen Kommentar, der als `fileStateChangeComment` mitgeschrieben wird.
+
+## Läufe, Audit und Undo
+
+`/runs` listet alle Läufe mit Status und Zählern je Feld (ok, geplant, unklar,
+fehlgeschlagen, übersprungen); `/runs/{id}` zeigt jede Feldübernahme mit Alt-/Neu-Wert,
+Status und Fehlertext.
+
+- Grundlage ist das Change-Log: `run`, `change_log` mit Datei, Feld, Alt-/Neu-Wert,
+  Status, Job-ID und Fehler.
+- „Undo vorbereiten“ nimmt nur nachweislich wirksame Felder (`ok`) zurück. Vorher wird der
+  aktuelle Wert gegen den damals geschriebenen Wert geprüft; abweichende Felder werden
+  übersprungen und gemeldet. Fehlt eine Datei oder ist kein Feld mehr zurücknehmbar,
+  bricht die Vorbereitung ab.
+- Das Undo ist eine neue Änderung: Es entsteht ein Arbeitsbestand „Undo zu Lauf N“ mit dem
+  aktuellen Stand als Snapshot und den alten Werten im ChangeSet; geschrieben wird über
+  dieselbe Review- und Schreibpipeline. Kein atomarer Rollback.
+- Feldwerte älter als 90 Tage werden entfernt (`python -m app purge-history` oder die
+  Schaltfläche in `/runs`); die kompakte Laufübersicht bleibt erhalten.
 
 ## Oberfläche und Sprache
 

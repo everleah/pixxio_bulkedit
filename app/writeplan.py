@@ -27,6 +27,11 @@ from app.workspaces import WorkspaceError, changed_changes
 CHUNK_SIZE = 200
 METADATA_ACTIONS = ("replace", "remove")
 
+FILE_STATE_KEY = "std:fileStateID"
+FILE_STATE_FIELD = "fileStateID"
+FILE_STATE_TRUNCATE = "truncateFileState"
+FILE_STATE_COMMENT = "fileStateChangeComment"
+
 # Standardattribute und ihre filesPut-Felder (Setzen / Leeren).
 FILE_ATTR_FIELDS: dict[str, tuple[str, str]] = {
     "subject": ("subject", "truncateSubject"),
@@ -87,6 +92,8 @@ class PlanPreview:
     warnings: list[str] = field(default_factory=list)
     digest: str = ""
     conflict_files: list[int] = field(default_factory=list)
+    comment: str = ""
+    requires_comment: bool = False
 
     @property
     def changed_cells(self) -> int:
@@ -111,12 +118,15 @@ def change_digest(changes: Iterable[tuple[int, str, str]]) -> str:
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
-def current_digest(session: Session, workspace_id: int) -> str:
-    """Digest des aktuell gespeicherten ChangeSets eines Arbeitsbestands."""
-    return change_digest(
+def current_digest(session: Session, workspace_id: int, *, comment: str = "") -> str:
+    """Digest des ChangeSets plus Kommentar (der Kommentar gehört zum Plan)."""
+    changes = list(
         (entry.file_id, entry.key, canonical_payload({"value": entry.new_value}))
         for entry in changed_changes(session, workspace_id)
     )
+    if comment.strip():
+        changes.append((-1, "comment", comment.strip()))
+    return change_digest(changes)
 
 
 def _metadata_namespace(column: ColumnDef) -> SimpleNamespace:
@@ -176,6 +186,16 @@ def _file_attr_payload(attribute: str, value: Any) -> dict[str, Any] | None:
     return {field_name: value}
 
 
+def _state_id(column: ColumnDef, value: Any) -> int:
+    """Dateistatus-Namen auf die API-ID abbilden."""
+    mapping = {name: state_id for state_id, name in column.option_ids}
+    text = str(value).strip()
+    state_id = mapping.get(text)
+    if state_id is None:
+        raise ScriptContractError(t("Unbekannter Dateistatus: {value}", value=text))
+    return state_id
+
+
 def _keywords_payload(old_value: Any, new_value: Any) -> dict[str, Any]:
     old_set = {str(item) for item in (old_value or [])} if isinstance(old_value, list) else set()
     new_set = {str(item) for item in (new_value or [])} if isinstance(new_value, list) else set()
@@ -194,9 +214,12 @@ def build_preview(
     workspace: Workspace,
     schema: ProfileSchema,
     script_columns: Sequence[str] | None,
+    *,
+    comment: str = "",
 ) -> PlanPreview:
     """Prüft das ChangeSet und bildet die Schreibschritte."""
     preview = PlanPreview()
+    preview.comment = comment.strip()
     entries = changed_changes(session, workspace.id)
     if not entries:
         preview.errors.append(t("Es gibt keine Änderungen."))
@@ -206,6 +229,11 @@ def build_preview(
     column_keys = list({entry.key for entry in entries})
     columns, unknown = resolve_columns(schema, column_keys)
     by_key = {column.key: column for column in columns}
+    preview.requires_comment = any(column.key == FILE_STATE_KEY for column in columns)
+    if preview.requires_comment and not preview.comment:
+        preview.errors.append(
+            t("Ein Statuswechsel verlangt einen Kommentar ({field}).", field=FILE_STATE_FIELD)
+        )
     for key in unknown:
         preview.errors.append(t("Unbekannte Spalte: {key}", key=key))
     available = set(script_columns or []) or None
@@ -258,6 +286,8 @@ def build_preview(
     for file_id, payload in per_file.items():
         if not payload:
             continue
+        if FILE_STATE_FIELD in payload or FILE_STATE_TRUNCATE in payload:
+            payload[FILE_STATE_COMMENT] = preview.comment
         digest = payload_digest(payload)
         grouped.setdefault(digest, []).append(file_id)
         payloads[digest] = payload
@@ -270,7 +300,7 @@ def build_preview(
                 )
             )
 
-    preview.digest = current_digest(session, workspace.id)
+    preview.digest = current_digest(session, workspace.id, comment=preview.comment)
     if not preview.steps and not preview.errors:
         preview.errors.append(t("Die Änderungen ergeben keinen Schreibvorgang."))
     return preview
@@ -281,6 +311,10 @@ def _payload_for(column: ColumnDef, old_value: Any, new_value: Any) -> dict[str,
         attribute = column.key.split(":", 1)[1]
         if attribute == "keywords":
             return _keywords_payload(old_value, new_value)
+        if attribute == "fileStateID":
+            if is_empty(new_value):
+                return {"truncateFileState": True}
+            return {"fileStateID": _state_id(column, new_value)}
         payload = _file_attr_payload(attribute, new_value)
         if payload is None:
             raise ScriptContractError(
@@ -334,6 +368,7 @@ def save_plan(
                 ],
                 "warnings": preview.warnings,
                 "conflicts": preview.conflict_files,
+                "comment": preview.comment,
             },
             ensure_ascii=False,
         ),
@@ -378,6 +413,12 @@ def plan_steps(session: Session, plan: WritePlan) -> list[WritePlanStep]:
 def plan_is_current(preview: PlanPreview, plan: WritePlan) -> bool:
     """Der Plan gilt nur für genau dieses ChangeSet."""
     return plan.change_digest == preview.digest
+
+
+def plan_comment(plan: WritePlan) -> str:
+    """Der im Plan gespeicherte Kommentar (Pflicht bei Statuswechsel)."""
+    stored = json.loads(plan.plan_json or "{}")
+    return str(stored.get("comment") or "")
 
 
 def modify_dates(session: Session, workspace_id: int, file_ids: Sequence[int]) -> dict[int, str]:
@@ -433,6 +474,7 @@ __all__ = [
     "latest_plan",
     "modify_dates",
     "payload_digest",
+    "plan_comment",
     "plan_is_current",
     "plan_steps",
     "preview_summary",

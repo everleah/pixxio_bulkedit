@@ -413,9 +413,17 @@ Test-Assets, Bulk-Wert im Grid, Review und Dry Run (Lauf 6), Schreiben (Lauf 7, 
 30293895, Ruecklesung 3/3), externer Konflikt blockiert den Lauf ohne Bestaetigung, mit
 Bestaetigung erfolgreich (Lauf 8), danach 0 Aenderungen im Entwurf.
 
-Offene Punkte: `fileStateChangeComment` (Pflichtkommentar bei Statuswechsel) ist noch nicht
-geprueft; `reconcile` fuer unterbrochene Auftraege ist implementiert, aber nur offline
-getestet.
+Offene Punkte: `reconcile` fuer unterbrochene Auftraege ist implementiert, aber nur
+offline getestet.
+
+**Nachtrag Dateistatus (30.10.2026):** `fileStateChangeComment` ist API-seitig optional;
+auf dem Testsystem greift `fileStateID` ohne Kommentar. Geprueft wurden `fileStateID`
+(Name→ID), `truncateFileState` (leert den Status) und eine unbekannte ID (abgelehnt mit
+"The specified fileState ID does not exist"). Der Status wird aus `fileState.id` gelesen,
+die Optionen kommen aus `GET /filestates`. In der Anwendung ist der Kommentar trotzdem
+Pflicht: `build_preview` verlangt ihn bei jeder Aenderung an `std:fileStateID`, sendet ihn
+als `fileStateChangeComment` und nimmt ihn in den Digest auf. Live geprueft: Statuswechsel
+auf `gesperrt` mit Kommentar (Lauf 10, Ruecklesung 1/1, Change-Log `std:fileStateID`).
 
 ### Schreibplan und Client-Nutzung
 
@@ -469,6 +477,18 @@ gezielt getestet.
 
 Eine kompakte Laufuebersicht darf anschliessend bestehen bleiben. Undo ist eine neue
 Aenderung, kein atomarer Rollback.
+
+**Umgesetzt (30.10.2026):** `app/runs.py` liefert die Laufuebersicht mit Zaehlern je
+Status (`list_runs`), die Feldhistorie (`run_changes`, `undoable_changes`) und die
+Undo-Vorbereitung (`prepare_undo`): nur Felder mit `ChangeStatus.OK`, aktueller Wert muss
+dem damals geschriebenen Wert entsprechen, danach entsteht ein Arbeitsbestand
+"Undo zu Lauf N" mit dem aktuellen Stand als Snapshot und den alten Werten im ChangeSet –
+geschrieben wird ueber die bestehende Review- und Schreibpipeline. Die Seiten `/runs` und
+`/runs/{id}` zeigen Laeufe, Felder und den Undo-Knopf; `purge_change_values` (90 Tage,
+`python -m app purge-history` oder Schaltflaeche) entfernt alte Feldwerte und laesst die
+kompakte Uebersicht stehen. Live geprueft: Undo zu Lauf 8 (Subjekt zurueck auf
+"Phase4 Titel", Lauf 11, Ruecklesung 1/1); Undo zu Lauf 10 wurde korrekt abgelehnt, weil
+der Status zwischenzeitlich extern geaendert wurde ("1 abweichend").
 
 ### Abschlusskriterium
 

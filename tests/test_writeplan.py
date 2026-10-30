@@ -21,10 +21,12 @@ from app.writeplan import (
     build_preview,
     canonical_payload,
     change_digest,
+    current_digest,
     detect_conflicts,
     latest_plan,
     modify_dates,
     payload_digest,
+    plan_comment,
     plan_is_current,
     plan_steps,
     preview_summary,
@@ -311,6 +313,90 @@ def test_fehlplan_wird_nicht_gespeichert(
 
     with pytest.raises(WritePlanError):
         save_plan(session, workspace, preview, actor=owner)
+
+
+def test_dateistatus_wird_als_id_geschrieben(
+    session: Session, workspace: Workspace, owner: AppUser
+) -> None:
+    state_schema = ProfileSchema(file_states=((371896184, "neu"), (1872385346, "gesperrt")))
+    column = state_schema.file_attr_column("fileStateID", "selection")
+    set_change(session, workspace, file_id=1, column=column, value="gesperrt")
+
+    preview = build_preview(session, workspace, state_schema, None, comment="Freigabe entzogen")
+
+    assert preview.errors == []
+    assert preview.requires_comment is True
+    assert preview.steps[0].payload == {
+        "fileStateID": 1872385346,
+        "fileStateChangeComment": "Freigabe entzogen",
+    }
+    assert plan_comment(save_plan(session, workspace, preview, actor=owner)) == "Freigabe entzogen"
+
+
+def test_statuswechsel_ohne_kommentar_wird_abgelehnt(
+    session: Session, workspace: Workspace
+) -> None:
+    state_schema = ProfileSchema(file_states=((1872385346, "gesperrt"),))
+    column = state_schema.file_attr_column("fileStateID", "selection")
+    set_change(session, workspace, file_id=1, column=column, value="gesperrt")
+
+    preview = build_preview(session, workspace, state_schema, None)
+
+    assert preview.requires_comment is True
+    assert preview.errors == ["Ein Statuswechsel verlangt einen Kommentar (fileStateID)."]
+
+
+def test_unbekannter_dateistatus_wird_abgelehnt(session: Session, workspace: Workspace) -> None:
+    state_schema = ProfileSchema(file_states=((1872385346, "gesperrt"),))
+    column = state_schema.file_attr_column("fileStateID", "selection")
+    column = ColumnDef(
+        key=column.key,
+        label=column.label,
+        source=column.source,
+        edit_type=column.edit_type,
+        options=column.options,
+        option_ids=column.option_ids,
+    )
+    _raw_change(session, workspace, file_id=1, key="std:fileStateID", value="unbekannt")
+
+    preview = build_preview(session, workspace, state_schema, None, comment="Test")
+
+    assert preview.errors == ["Dateistatus: Unbekannter Dateistatus: unbekannt"]
+
+
+def test_kommentar_gehoert_zum_digest(session: Session, workspace: Workspace) -> None:
+    state_schema = ProfileSchema(file_states=((1872385346, "gesperrt"),))
+    column = state_schema.file_attr_column("fileStateID", "selection")
+    set_change(session, workspace, file_id=1, column=column, value="gesperrt")
+
+    first = build_preview(session, workspace, state_schema, None, comment="Grund A")
+    second = build_preview(session, workspace, state_schema, None, comment="Grund B")
+
+    assert first.digest != second.digest
+    assert current_digest(session, workspace.id, comment="Grund A") == first.digest
+
+
+def test_geleerter_dateistatus_wird_abgeschnitten(
+    session: Session, owner: AppUser, profile: Profile
+) -> None:
+    rows = [
+        AssetRow(
+            file_id=1,
+            modify_date="2026-10-01 10:00:00",
+            values={"std:subject": "Alt", "std:fileStateID": "gesperrt"},
+        )
+    ]
+    other = create_workspace(session, owner=owner, profile=profile, name="Status")
+    store_snapshot(session, other, rows)
+    state_schema = ProfileSchema(file_states=((1872385346, "gesperrt"),))
+    column = state_schema.file_attr_column("fileStateID", "selection")
+    set_change(session, other, file_id=1, column=column, value="")
+
+    preview = build_preview(session, other, state_schema, None, comment="Zurueckgesetzt")
+
+    payload = preview.steps[0].payload
+    assert payload["truncateFileState"] is True
+    assert payload["fileStateChangeComment"] == "Zurueckgesetzt"
 
 
 def test_vorschau_kurzfassung(

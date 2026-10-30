@@ -221,6 +221,43 @@ EN_TRANSLATIONS: dict[str, str] = {
     "Dry Run prüfen": "Check dry run",
     "Jetzt schreiben": "Write now",
     "Zum Grid": "Back to grid",
+    "Läufe": "Runs",
+    "Lauf {run}": "Run {run}",
+    "Lauf öffnen": "Open run",
+    "Zurück zu den Läufen": "Back to runs",
+    "Undo vorbereiten": "Prepare undo",
+    "Nur nachweislich wirksame Änderungen lassen sich zurücknehmen.": (
+        "Only provably effective changes can be undone."
+    ),
+    "Es gibt noch keine Läufe.": "There are no runs yet.",
+    "Der Lauf wurde nicht gefunden.": "The run was not found.",
+    "Das Profil des Laufs fehlt.": "The profile of the run is missing.",
+    "Der Lauf hat kein Profil.": "The run has no profile.",
+    "Der Lauf enthält keine Feldänderungen.": "The run contains no field changes.",
+    "Unbekannte Spalten im Lauf: {keys}": "Unknown columns in the run: {keys}",
+    "Dateien fehlen: {files}": "Missing files: {files}",
+    "Kein Feld lässt sich zurücknehmen ({diverged} abweichend, {status} nicht wirksam).": (
+        "No field can be undone ({diverged} diverged, {status} not effective)."
+    ),
+    "Dieser Lauf hat keine Feldänderungen.": "This run has no field changes.",
+    "Nur wirksame Felder werden zurückgenommen; der Rest bleibt unberührt.": (
+        "Only effective fields are undone; the rest stays untouched."
+    ),
+    "{count} Feldwerte entfernt.": "{count} field values removed.",
+    "Alte Feldwerte entfernen": "Remove old field values",
+    "{count} Felder für das Undo vorbereitet ({diverged} abweichend, {status} nicht wirksam).": (
+        "{count} fields prepared for undo ({diverged} diverged, {status} not effective)."
+    ),
+    "ok {ok} | geplant {planned} | unklar {unknown} | fehlgeschlagen {failed} | "
+    "übersprungen {skipped}": (
+        "ok {ok} | planned {planned} | unclear {unknown} | failed {failed} | skipped {skipped}"
+    ),
+    "Undo zu Lauf {run}": "Undo of run {run}",
+    "Kommentar zum Statuswechsel": "Comment for the state change",
+    "Ein Statuswechsel verlangt einen Kommentar ({field}).": (
+        "A state change requires a comment ({field})."
+    ),
+    "Unbekannter Dateistatus: {value}": "Unknown file state: {value}",
     "Nur geänderte Felder werden geschrieben; jedes Ergebnis wird zurückgelesen.": (
         "Only changed fields are written; every result is read back."
     ),

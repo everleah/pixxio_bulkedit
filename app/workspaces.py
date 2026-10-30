@@ -270,7 +270,11 @@ def _append_row(
 def _read_value(payload: dict[str, Any], column: ColumnDef, metadata: dict[str, Any]) -> Any:
     if column.source == "file_attr":
         attribute = column.key.split(":", 1)[1]
-        raw = payload.get(attribute)
+        if attribute == "fileStateID":
+            state = payload.get("fileState")
+            raw = state.get("id") if isinstance(state, dict) else None
+        else:
+            raw = payload.get(attribute)
         if attribute == "keywords":
             raw = raw or []
         return _canonical_safe(column, raw)

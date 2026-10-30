@@ -19,7 +19,8 @@
   Schutz des letzten aktiven Superusers.
 - `colors.py`: Meadow-Palette und WCAG-Kontrastberechnung.
 - `schema.py`: Profilschema mit `ColumnDef` (Schluessel `std:*`, `custom:<id>`,
-  `standard:<id>`), `resolve_columns` (IDs oder Namen), `SchemaCache` mit TTL.
+  `standard:<id>`), `resolve_columns` (IDs oder Namen), `SchemaCache` mit TTL;
+  `fetch_file_states` liefert die Dateistatus-Werte als Optionen von `std:fileStateID`.
 - `normalize.py`: Anzeigenormalform je Feldtyp (Texte bleiben exakt), `values_equal`
   fuer den Diff, `display_value`.
 - `workspaces.py`: Arbeitsbestaende (Snapshot in `workspace_asset.values_json`,
@@ -29,9 +30,13 @@
   geschriebene Felder in den Snapshot und leert ihre Aenderung.
 - `writeplan.py`: Schreibplan aus dem ChangeSet (`build_preview`, Gruppierung gleicher
   Payloads in Schritte zu `CHUNK_SIZE`), Payload-Bildung je Feldtyp, Digest des Entwurfs
-  (`current_digest`), Konflikterkennung ueber `modifyDate` und Persistenz (`save_plan`).
+  (`current_digest`, inklusive Kommentar), Konflikterkennung ueber `modifyDate` und
+  Persistenz (`save_plan`, `plan_comment`).
 - `writer.py`: Review gegen die API (`review`, `read_files`), Dry Run, Ausfuehrung,
   Rueckleseverifikation und Protokoll (`dry_run`, `execute`, `reconcile`).
+- `runs.py`: Laufuebersicht (`list_runs` mit Zaehlern je Status), Feldhistorie
+  (`run_changes`, `undoable_changes`), Undo-Vorbereitung (`prepare_undo`) und
+  Aufbewahrungsgrenze (`purge_change_values`, 90 Tage).
 - `profiles.py`: Profile anlegen und aendern (API-Key verschluesselt, Hint statt Key),
   Verbindungstest protokollieren, Host normalisieren; schreibt `AdminAudit`-Eintraege.
 - `clients.py`: `ClientFactory` haelt je Profil einen pixx.io-Client, ent- und
@@ -84,6 +89,16 @@
 - `ChangeStatus` umfasst `planned`, `ok`, `failed`, `skipped`, `skipped_conflict`,
   `unknown`; `StepStatus` zusaetzlich `partial`. Beide Wertebereiche sind per CHECK
   abgesichert (Revision `0002`).
+- Ein Undo entsteht ausschliesslich aus Eintraegen mit `ChangeStatus.OK`. Vor dem
+  Zuruecknehmen wird der aktuelle Wert gegen den damals geschriebenen Wert geprueft;
+  abweichende Felder werden uebersprungen und gemeldet. `prepare_undo` legt einen neuen
+  Arbeitsbestand (Snapshot = aktueller Stand) an und schreibt die alten Werte als
+  ChangeSet – Undo ist eine neue Aenderung durch dieselbe Review-/Schreibpipeline, kein
+  Rollback.
+- `purge_change_values` entfernt `old_value`/`new_value` nach
+  `HISTORY_RETENTION_DAYS` (90) Tagen; `run`, `file_id`, `field_key` und `status` bleiben
+  fuer die Laufuebersicht erhalten. Aufruf ueber `python -m app purge-history` oder die
+  Schaltflaeche in `/runs`.
 - Werte im effektiven Stand immer als `CASE WHEN change.id IS NOT NULL THEN change.new_value
   ELSE json_extract(...) END` ausdruecken; `COALESCE` wuerde geleerte Werte falsch aufloesen.
 - Spaltenkennungen sind durchgaengig `std:<attribut>`, `custom:<feld-id>` oder
@@ -98,6 +113,11 @@
   warnt die UI. Laufende Schreibauftraege verlaengern die Laufzeit.
 - Standardattribute der Datei (`std:*`) und Metadaten (`custom:*`, `standard:*`) werden
   getrennt gelesen: erstere direkt am File, letztere aus `metadataFields[str(feld_id)]`.
+  Der Dateistatus kommt aus `fileState.id` und wird ueber die Optionen zu seinem Namen
+  aufgeloest; geschrieben wird `fileStateID` als numerische ID.
+- Ein Statuswechsel (`std:fileStateID`) verlangt in dieser Anwendung einen Kommentar:
+  `build_preview` bricht ohne Kommentar ab und sendet ihn als `fileStateChangeComment`
+  im selben Schritt. Der Kommentar steckt im Plan (`plan_json.comment`) und im Digest.
 - `app/bench/` arbeitet offline auf synthetischen Daten und nie auf der Anwendungsdatenbank.
 - Die Prototyp-Route `/bench` und `/bench/rows` gehoert nur zum Lastnachweis; Fachseiten
   entstehen getrennt davon.

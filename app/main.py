@@ -36,6 +36,7 @@ from app.settings import get_settings
 from app.ui.admin import register_admin_pages
 from app.ui.guard import current_user, logout
 from app.ui.review import register_review_pages
+from app.ui.runs import register_run_pages
 from app.ui.scripts import register_script_pages
 from app.ui.shell import apply_locale, apply_palette
 from app.ui.widgets import action_button
@@ -134,6 +135,7 @@ def main() -> None:
     register_script_pages(session_factory, secret_box, runner)
     register_workspace_pages(session_factory, secret_box, schema_cache, client_factory, runner)
     register_review_pages(session_factory, schema_cache, client_factory)
+    register_run_pages(session_factory, schema_cache, client_factory)
 
     ui.run(
         title=APP_TITLE,

@@ -92,6 +92,9 @@ def register_review_pages(
         message = ui.label("").classes("text-sm")
         problems = ui.column().classes("w-full gap-0")
         overwrite = ui.checkbox(t("Externe Änderungen überschreiben"), value=False)
+        comment = (
+            ui.input(t("Kommentar zum Statuswechsel")).props("outlined dense").classes("w-full")
+        )
         table = ui.column().classes("w-full gap-0")
 
         def load(session: Any) -> tuple[Workspace | None, Profile | None, AppUser | None]:
@@ -107,7 +110,13 @@ def register_review_pages(
                 raise ValueError(t("Der Arbeitsbestand wurde nicht gefunden."))
             client = client_factory.client_for(profile)
             return review(
-                session, workspace_row, schema, columns, client, script_columns=script_keys
+                session,
+                workspace_row,
+                schema,
+                columns,
+                client,
+                script_columns=script_keys,
+                comment=str(comment.value or ""),
             )
 
         def plan_for(session: Any, preview: PlanPreview) -> Any:
@@ -121,6 +130,10 @@ def register_review_pages(
             return plan
 
         def show(preview: PlanPreview) -> None:
+            if preview.requires_comment and not preview.comment:
+                comment.classes(add="text-negative")
+            else:
+                comment.classes(remove="text-negative")
             message.set_text(
                 t(
                     "Feldänderungen: {changes} | Dateien: {files} | Anfragen: {steps}",

@@ -48,6 +48,7 @@ def page_header(title: str, user: AppUser) -> None:
         ui.label(title).classes("text-lg font-semibold")
         nav_link(t("Start"), "/")
         nav_link(t("Arbeitsbestände"), "/workspaces")
+        nav_link(t("Läufe"), "/runs")
         nav_link(t("Scripts"), "/scripts")
         if user.role is Role.SUPERUSER:
             nav_link(t("Profile"), "/admin/profiles")

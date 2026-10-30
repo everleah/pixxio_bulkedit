@@ -24,6 +24,7 @@ from app.crypto import SecretBox, generate_master_key
 from app.db import create_engine_for, create_session_factory, run_migrations, session_scope
 from app.models import AppUser, Profile, Role
 from app.profiles import ProfileData, ProfileError, create_profile, update_profile
+from app.runs import HISTORY_RETENTION_DAYS
 from app.scripts.service import ensure_templates
 from app.settings import Settings, get_settings
 
@@ -155,6 +156,17 @@ def command_create_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_purge_history(args: argparse.Namespace) -> int:
+    from app.runs import purge_change_values
+
+    settings = _require_settings()
+    factory = _open_session_factory(settings)
+    with session_scope(factory) as session:
+        removed = purge_change_values(session, days=args.days)
+    print(f"{removed} Feldwerte aus Laeufen aelter als {args.days} Tage entfernt.")
+    return 0
+
+
 def command_serve(_args: argparse.Namespace) -> int:
     from app.main import main as run_server
 
@@ -207,6 +219,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     serve = subparsers.add_parser("serve", help="Weboberflaeche starten")
     serve.set_defaults(handler=command_serve)
+
+    purge = subparsers.add_parser(
+        "purge-history", help="Feldwerte alter Laeufe entfernen (Laufuebersicht bleibt)"
+    )
+    purge.add_argument(
+        "--days",
+        type=int,
+        default=HISTORY_RETENTION_DAYS,
+        help="Aufbewahrung in Tagen (Standard: %(default)s)",
+    )
+    purge.set_defaults(handler=command_purge_history)
     return parser
 
 

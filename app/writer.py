@@ -55,6 +55,7 @@ from app.writeplan import (
     current_digest,
     detect_conflicts,
     modify_dates,
+    plan_comment,
     plan_is_current,
     plan_steps,
 )
@@ -187,9 +188,10 @@ def review(
     client: Any,
     *,
     script_columns: Sequence[str] | None = None,
+    comment: str = "",
 ) -> PlanPreview:
     """ChangeSet prüfen und externe Änderungen sowie Überschneidungen melden."""
-    preview = build_preview(session, workspace, schema, script_columns)
+    preview = build_preview(session, workspace, schema, script_columns, comment=comment)
     if not preview.changes:
         return preview
     file_ids = {change.file_id for change in preview.changes}
@@ -215,7 +217,8 @@ def execution_blockers(
         blockers.append(t("Der Plan enthält Fehler und ist nicht ausführbar."))
     if not plan_is_current(preview, plan) or (
         plan.workspace_id is not None
-        and current_digest(session, plan.workspace_id) != plan.change_digest
+        and current_digest(session, plan.workspace_id, comment=plan_comment(plan))
+        != plan.change_digest
     ):
         blockers.append(t("Der Entwurf hat sich geändert. Bitte Review und Dry Run erneuern."))
     if plan.status in {PlanStatus.RUNNING, PlanStatus.COMPLETED}:
@@ -307,7 +310,10 @@ def dry_run(
         raise WriteError(t("Der Arbeitsbestand zum Plan fehlt."))
     if preview.errors:
         raise WriteError("\n".join(preview.errors))
-    if current_digest(session, plan.workspace_id or 0) != plan.change_digest:
+    if (
+        current_digest(session, plan.workspace_id or 0, comment=plan_comment(plan))
+        != plan.change_digest
+    ):
         raise WriteError(t("Der Entwurf hat sich geändert. Bitte Review und Dry Run erneuern."))
 
     file_ids = sorted({change.file_id for change in preview.changes})

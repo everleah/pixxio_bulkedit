@@ -29,6 +29,9 @@
 - `review.py`: `register_review_pages` registriert `/workspaces/{id}/review`: Liste aller
   Feldänderungen, Fehler/Hinweise (inklusive externer Aenderungen), `Dry Run prüfen`,
   `Jetzt schreiben` und Rueckweg ins Grid.
+- `runs.py`: `register_run_pages` registriert `/runs` (Laufuebersicht mit Zaehlern je
+  Status, `Alte Feldwerte entfernen`) und `/runs/{id}` (Feldhistorie je Datei mit
+  Alt-/Neu-Wert, `Undo vorbereiten`).
 
 ## Local Contracts
 
@@ -65,10 +68,16 @@
   und Konflikte an. Geschrieben wird nur ueber `client_factory.writer_client_for`.
 - Blockierende Arbeit (Preview, Dry Run, Schreiben) laeuft in `run.io_bound` und oeffnet
   dort eine eigene Session; danach aktualisiert die Seite die Anzeige mit dem neuen Preview.
+- Ein Feld "Kommentar zum Statuswechsel" gehoert zum Preview-Aufbau: `build_preview` bricht
+  ohne Kommentar ab, sobald `std:fileStateID` geaendert wird; das Feld wird dann rot
+  markiert und der Fehler in der Hinweisliste angezeigt.
 - Nach erfolgreichem Schreiben zeigt die Seite das frische Preview (0 Aenderungen) und
   meldet, wie viele Aenderungen aus dem Entwurf entfernt wurden.
 - Die Ueberschreibbestaetigung ist eine Checkbox und wird nur wirksam, wenn Konflikte
   gemeldet sind; ohne Bestaetigung blockiert `execution_blockers` den Live-Lauf.
+- `/runs/{id}` zeigt je Feld Alt-/Neu-Wert und Status; `Undo vorbereiten` springt nach
+  Erfolg direkt in die Review-Seite des neuen Undo-Arbeitsbestands. Bei nur teilweise
+  wirksamen Laeufen erscheint ein Hinweis, dass nur wirksame Felder zurueckgenommen werden.
 
 ## Work Guidance
 
