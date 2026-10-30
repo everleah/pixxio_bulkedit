@@ -106,13 +106,19 @@ Anwendungskonfiguration nicht:
 .\.venv\Scripts\python.exe -m app.spike report
 .\.venv\Scripts\python.exe -m app.spike whoami
 .\.venv\Scripts\python.exe -m app.spike collection
+.\.venv\Scripts\python.exe -m app.spike collections
 .\.venv\Scripts\python.exe -m app.spike schema --json
 .\.venv\Scripts\python.exe -m app.spike files --limit 10
+.\.venv\Scripts\python.exe -m app.spike paging --page-size 5
 .\.venv\Scripts\python.exe -m app.spike fixtures create --count 2
 .\.venv\Scripts\python.exe -m app.spike probe
 .\.venv\Scripts\python.exe -m app.spike status
 .\.venv\Scripts\python.exe -m app.spike fixtures delete
 ```
+
+`collection`, `files` und `paging` akzeptieren `--collection-id`, um auch andere
+Collections lesend zu pruefen (Standard ist `PXTEST_COLLECTION_ID`); Schreibzugriffe
+bleiben auf die konfigurierte Collection beschraenkt.
 
 `report`, `whoami`, `collection`, `schema` und `files` lesen nur. `fixtures create`
 legt eigene PNG-Testdateien in der Collection an und protokolliert ihre IDs in

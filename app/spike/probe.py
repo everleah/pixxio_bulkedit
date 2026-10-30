@@ -44,6 +44,12 @@ PROBE_SUBJECT = "bulkedit-probe subject"
 PROBE_KEYWORD = "bulkedit-probe-keyword"
 INVALID_FIELD_ID = 1
 STANDARD_CANDIDATES = 12
+DATE_CANDIDATES = (
+    "2026-12-31 23:45:00",
+    "2026-12-31T23:45:00",
+    "2026-12-31",
+    "2026-12-31 23:45",
+)
 
 
 @dataclass(frozen=True)
@@ -67,6 +73,8 @@ class ProbeFields:
     multiselection_id: int
     multiselection_name: str
     multiselection_options: tuple[str, ...]
+    date_id: int | None = None
+    date_name: str | None = None
 
 
 def _option_names(field: dict[str, Any]) -> list[str]:
@@ -110,6 +118,7 @@ def select_probe_fields(custom_fields: list[dict[str, Any]]) -> ProbeFields:
         )
 
     selection_options = _option_names(selection)
+    date_field = first_custom("date")
     return ProbeFields(
         text_id=int(text["id"]),
         text_name=str(text.get("name")),
@@ -119,6 +128,8 @@ def select_probe_fields(custom_fields: list[dict[str, Any]]) -> ProbeFields:
         multiselection_id=int(multiselection["id"]),
         multiselection_name=str(multiselection.get("name")),
         multiselection_options=tuple(_option_names(multiselection)[:2]),
+        date_id=int(date_field["id"]) if date_field else None,
+        date_name=str(date_field.get("name")) if date_field else None,
     )
 
 
@@ -428,6 +439,75 @@ def _standard_candidates(
     ]
 
 
+def _check_date_field(
+    client: Client, target: int, chosen: ProbeFields, custom_fields: list[dict[str, Any]]
+) -> ProbeResult:
+    """Sucht das akzeptierte Datumsformat und protokolliert den Rueckgabewert."""
+    if chosen.date_id is None:
+        return ProbeResult(
+            name="Datumsfeld schreiben",
+            ok=False,
+            detail="kein Custom-Feld mit editType 'date' vorhanden",
+        )
+    rejected: list[str] = []
+    for candidate in DATE_CANDIDATES:
+        payload = {
+            "metadataCustom": build_metadata_entries(
+                custom_fields, [("replace", chosen.date_id, candidate)]
+            )
+        }
+        try:
+            response = _update(client, [target], payload)
+        except PIXXIOException as exc:
+            rejected.append(f"{candidate!r}: {exc}")
+            continue
+        observed = metadata_value(fetch_snapshot(client, target), chosen.date_id)
+        return ProbeResult(
+            name=f"Datumsfeld schreiben ({chosen.date_name})",
+            ok=observed is not None,
+            detail=(
+                f"akzeptiert {candidate!r}, gespeichert {observed!r}; "
+                f"{_job_details(response)}; vorher abgelehnt: {len(rejected)}"
+            ),
+        )
+    return ProbeResult(
+        name=f"Datumsfeld schreiben ({chosen.date_name})",
+        ok=False,
+        detail="kein Format akzeptiert: " + " | ".join(rejected[:3]),
+    )
+
+
+def _check_partial_payload(
+    client: Client, target: int, chosen: ProbeFields, custom_fields: list[dict[str, Any]]
+) -> ProbeResult:
+    """Ein gueltiges und ein ungueltiges Feld im selben filesPut."""
+    valid = build_metadata_entries(custom_fields, [("replace", chosen.text_id, PROBE_TEXT)])
+    payload = {
+        "metadataCustom": [*valid, {"action": "replace", "id": INVALID_FIELD_ID, "value": "x"}]
+    }
+    try:
+        response = _update(client, [target], payload)
+    except PIXXIOException as exc:
+        applied = metadata_value(fetch_snapshot(client, target), chosen.text_id)
+        return ProbeResult(
+            name="Teilfehler im selben Request",
+            ok=True,
+            detail=(
+                f"Fehler gemeldet ({type(exc).__name__}: {exc}); gueltiges Feld wurde "
+                f"trotzdem geschrieben: {applied!r} -> Request ist nicht atomar"
+            ),
+        )
+    applied = metadata_value(fetch_snapshot(client, target), chosen.text_id)
+    return ProbeResult(
+        name="Teilfehler im selben Request",
+        ok=False,
+        detail=(
+            f"ungueltiges Feld ohne Fehler akzeptiert; gueltiges Feld {applied!r}; "
+            f"{_job_details(response)}"
+        ),
+    )
+
+
 def _check_standard_metadata(
     client: Client, target: int, standard_fields: list[dict[str, Any]]
 ) -> ProbeResult:
@@ -580,6 +660,14 @@ def run_write_checks(
         (
             "Standard-Metadaten schreiben",
             lambda: _check_standard_metadata(client, anchor, standard_fields),
+        ),
+        (
+            f"Datumsfeld schreiben ({chosen.date_name})",
+            lambda: _check_date_field(client, anchor, chosen, custom_fields),
+        ),
+        (
+            "Teilfehler im selben Request",
+            lambda: _check_partial_payload(client, anchor, chosen, custom_fields),
         ),
         (
             f"Metadatenwert entfernen ({chosen.text_name})",

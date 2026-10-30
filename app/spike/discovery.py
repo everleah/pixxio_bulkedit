@@ -75,6 +75,51 @@ def summarize_collection(response: dict[str, Any]) -> dict[str, Any]:
     return {field: source.get(field) for field in COLLECTION_FIELDS}
 
 
+def fetch_collection_list(client: Client) -> dict[str, Any]:
+    collections = Collection(client)
+    collections.set_response_fields(COLLECTION_FIELDS)
+    return as_dict(collections.get(pageSize=FILES_PAGE_SIZE))
+
+
+def summarize_collections(response: dict[str, Any]) -> dict[str, Any]:
+    """Listet Collections und trennt statische von dynamischen."""
+    entries = [as_dict(entry) for entry in (response.get("collections") or [])]
+    rows = [{field: entry.get(field) for field in COLLECTION_FIELDS} for entry in entries]
+    dynamic = [row for row in rows if row.get("isDynamic")]
+    return {"count": len(rows), "dynamic_count": len(dynamic), "collections": rows}
+
+
+def fetch_pages(
+    client: Client, collection_id: int, page_size: int, max_pages: int = 50
+) -> list[dict[str, Any]]:
+    """Holt die Collection seitenweise und protokolliert jede Antwort."""
+    files = File(client)
+    pages: list[dict[str, Any]] = []
+    page = 1
+    while page <= max_pages:
+        response = as_dict(
+            files.get(
+                page=page,
+                pageSize=page_size,
+                filter=collection_filter(collection_id),
+                responseFields=["id", "fileName"],
+            )
+        )
+        items = response.get("files") or []
+        pages.append(
+            {
+                "page": page,
+                "count": len(items),
+                "quantity": response.get("quantity"),
+                "has_cursor": response.get("cursor") is not None,
+            }
+        )
+        if len(items) < page_size:
+            break
+        page += 1
+    return pages
+
+
 def fetch_custom_fields(client: Client) -> list[dict[str, Any]]:
     """Custom-Metadaten inklusive editType und Auswahloptionen."""
     custom = CustomMetadata(client)

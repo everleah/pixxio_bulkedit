@@ -48,6 +48,8 @@
   werden Eintraege trotzdem aus dem bereits geladenen Schema gebaut (kein zweiter Abruf).
 - `pageSize`: `files` bis 500, `customMetadata` bis 50, `standardMetadata` ohne Paging
   (`FILES_PAGE_SIZE`/`METADATA_PAGE_SIZE` aus `app/spike/client.py` nutzen).
+- `filesPut` ist nicht atomar: vor dem Senden validieren und nach Teilfehlern ruecklesen.
+- Datumswerte als `YYYY-MM-DD HH:MM:SS` senden; ISO mit Offset lehnt die API ab.
 
 ## Work Guidance
 

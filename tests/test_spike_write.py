@@ -28,6 +28,7 @@ CUSTOM_FIELDS = [
         "editType": "multiselection",
         "selectionOptions": [{"id": 31, "name": "Kabel"}, {"id": 32, "name": "Dichtung"}],
     },
+    {"id": 4, "name": "Datum_Test", "editType": "date", "selectionOptions": None},
 ]
 STANDARD_FIELDS = [
     {"id": 9, "name": "Width", "editType": "number", "selectionOptions": None},
@@ -136,6 +137,15 @@ def test_select_probe_fields_waehlt_vertreter() -> None:
     assert chosen.selection_name == "Land"
     assert chosen.selection_option == "Deutschland"
     assert chosen.multiselection_options == ("Kabel", "Dichtung")
+    assert chosen.date_id == 4
+    assert chosen.date_name == "Datum_Test"
+
+
+def test_select_probe_fields_ohne_datumsfeld() -> None:
+    without_date = [field for field in CUSTOM_FIELDS if field["editType"] != "date"]
+    chosen = select_probe_fields(without_date)
+    assert chosen.date_id is None
+    assert chosen.date_name is None
 
 
 def test_select_probe_fields_meldet_fehlende_felder() -> None:

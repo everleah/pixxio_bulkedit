@@ -20,12 +20,15 @@ from pydantic import ValidationError
 from app.spike.client import FILES_PAGE_SIZE, METADATA_PAGE_SIZE, build_client
 from app.spike.discovery import (
     fetch_collection,
+    fetch_collection_list,
     fetch_custom_fields,
     fetch_files_page,
+    fetch_pages,
     fetch_standard_fields,
     fetch_user,
     file_count,
     summarize_collection,
+    summarize_collections,
     summarize_files,
     summarize_schema,
     summarize_user,
@@ -74,11 +77,17 @@ def command_whoami(args: argparse.Namespace) -> int:
     return 0
 
 
+def _collection_id(args: argparse.Namespace, settings: SpikeSettings) -> int:
+    configured = getattr(args, "collection_id", None)
+    return int(configured) if configured else settings.collection_id
+
+
 def command_collection(args: argparse.Namespace) -> int:
     settings = _load_settings()
     client = build_client(settings)
-    collection = summarize_collection(fetch_collection(client, settings.collection_id))
-    quantity = file_count(fetch_files_page(client, settings.collection_id, 1))
+    collection_id = _collection_id(args, settings)
+    collection = summarize_collection(fetch_collection(client, collection_id))
+    quantity = file_count(fetch_files_page(client, collection_id, 1))
     lines = [
         f"Host: {settings.host}",
         f"Collection: {collection['name']} (id {collection['id']})",
@@ -86,7 +95,11 @@ def command_collection(args: argparse.Namespace) -> int:
         f"Treffer laut Dateiliste: {quantity}",
         f"pageSize-Maximum: files {FILES_PAGE_SIZE}, customMetadata {METADATA_PAGE_SIZE}",
     ]
-    payload = {"host": settings.host, "collection": collection, "quantity": quantity}
+    payload = {
+        "host": settings.host,
+        "collection": collection,
+        "quantity": quantity,
+    }
     _emit(payload, args.json, lines)
     return 0
 
@@ -111,7 +124,8 @@ def command_schema(args: argparse.Namespace) -> int:
 def command_files(args: argparse.Namespace) -> int:
     settings = _load_settings()
     client = build_client(settings)
-    page = fetch_files_page(client, settings.collection_id, args.limit)
+    collection_id = _collection_id(args, settings)
+    page = fetch_files_page(client, collection_id, args.limit)
     rows = summarize_files(page)
     lines = [f"{file_count(page)} Treffer, gezeigt: {len(rows)}"]
     for row in rows:
@@ -121,7 +135,7 @@ def command_files(args: argparse.Namespace) -> int:
         )
         if row["customFilled"]:
             lines.append(f"    gefuellte Custom-Felder: {row['customFilled']}")
-    payload = {"collection_id": settings.collection_id, "files": rows}
+    payload = {"collection_id": collection_id, "files": rows}
     _emit(payload, args.json, lines)
     return 0
 
@@ -174,6 +188,42 @@ def command_report(args: argparse.Namespace) -> int:
             f"| Custom-Felder {row['customFieldCount']}, gefuellt {len(row['customFilled'])}"
         )
     payload["files"] = rows
+    _emit(payload, args.json, lines)
+    return 0
+
+
+def command_collections(args: argparse.Namespace) -> int:
+    client = build_client(_load_settings())
+    summary = summarize_collections(fetch_collection_list(client))
+    lines = [
+        f"Collections: {summary['count']} ({summary['dynamic_count']} dynamisch, "
+        f"{summary['count'] - summary['dynamic_count']} statisch)"
+    ]
+    for row in summary["collections"]:
+        kind = "dynamisch" if row.get("isDynamic") else "statisch"
+        lines.append(
+            f"- {row['id']} {row['name']} | {kind} | filesQuantity {row.get('filesQuantity')}"
+        )
+    _emit(summary, args.json, lines)
+    return 0
+
+
+def command_paging(args: argparse.Namespace) -> int:
+    settings = _load_settings()
+    client = build_client(settings)
+    collection_id = _collection_id(args, settings)
+    pages = fetch_pages(client, collection_id, args.page_size)
+    total = sum(page["count"] for page in pages)
+    quantity = pages[0]["quantity"] if pages else None
+    lines = [
+        f"pageSize {args.page_size}: {len(pages)} Seite(n), {total} Eintraege, quantity {quantity}"
+    ]
+    for page in pages:
+        lines.append(
+            f"- Seite {page['page']}: {page['count']} Eintraege | "
+            f"quantity {page['quantity']} | cursor {page['has_cursor']}"
+        )
+    payload = {"page_size": args.page_size, "quantity": quantity, "pages": pages}
     _emit(payload, args.json, lines)
     return 0
 
@@ -250,9 +300,12 @@ def build_parser() -> argparse.ArgumentParser:
         return subparser
 
     add("whoami", "API-Benutzer des Keys anzeigen", command_whoami)
-    add("collection", "Collection und Trefferzahl anzeigen", command_collection)
+    collection_parser = add("collection", "Collection und Trefferzahl anzeigen", command_collection)
+    collection_parser.add_argument("--collection-id", type=int, default=None)
+    add("collections", "Alle Collections mit Typ und Anzahl anzeigen", command_collections)
     add("schema", "Metadatenfelder und editTypes anzeigen", command_schema)
     files_parser = add("files", "Beispieldateien mit Werten anzeigen", command_files)
+    files_parser.add_argument("--collection-id", type=int, default=None)
     files_parser.add_argument(
         "--limit",
         type=int,
@@ -260,6 +313,9 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Anzahl Beispieldateien (maximal {FILES_PAGE_SIZE})",
     )
     add("report", "Alle Lesepruefungen mit Laufzeiten", command_report)
+    paging_parser = add("paging", "Seitenweises Laden der Collection pruefen", command_paging)
+    paging_parser.add_argument("--collection-id", type=int, default=None)
+    paging_parser.add_argument("--page-size", type=int, default=3)
     add("status", "Ledger der eigenen Test-Assets anzeigen", command_status)
     add("probe", "Schreibpruefungen auf eigenen Test-Assets ausfuehren", command_probe)
 

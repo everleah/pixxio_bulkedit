@@ -15,6 +15,7 @@ from app.spike.discovery import (
     collection_filter,
     file_count,
     summarize_collection,
+    summarize_collections,
     summarize_files,
     summarize_schema,
     summarize_user,
@@ -114,6 +115,20 @@ def test_summarize_collection_aus_einzelantwort() -> None:
     assert summary["id"] == 1
     assert summary["name"] == "einzeln"
     assert summary["isDynamic"] is None
+
+
+def test_summarize_collections_trennt_dynamisch_und_statisch() -> None:
+    response = {
+        "success": True,
+        "collections": [
+            FakeResponse(id=1, name="statisch", isDynamic=False, filesQuantity=4),
+            FakeResponse(id=2, name="dynamisch", isDynamic=True, filesQuantity=10),
+        ],
+    }
+    summary = summarize_collections(response)
+    assert summary["count"] == 2
+    assert summary["dynamic_count"] == 1
+    assert summary["collections"][1]["name"] == "dynamisch"
 
 
 def test_summarize_schema_zaehlt_edit_types_und_optionen() -> None:

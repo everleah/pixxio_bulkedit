@@ -159,6 +159,19 @@ ergaenzt werden; eine Collection allein bleibt keine Schutzgrenze.
 - `filesPut` beantwortet eine einzelne ID synchron ohne Job; mehrere IDs erzeugen einen
   Job (`jobType filesPut` mit `success`/`error`). `modifyDate` aendert sich durch den
   Schreibvorgang und traegt damit die Konflikterkennung.
+- `filesPut` ist **nicht atomar**: enthaelt ein Request ein unbekanntes Feld, antwortet die
+  API mit einem Fehler, schreibt die gueltigen Felder aber trotzdem. Der Writer muss vor
+  dem Senden validieren und nach Teilfehlern ruecklesen.
+- Datumsfelder akzeptieren `YYYY-MM-DD HH:MM:SS`; ein ISO-Wert mit Offset
+  (`2026-12-31T23:45:00+00:00`) wird mit `no DateTime` abgelehnt. Der gespeicherte Wert
+  kommt unveraendert zurueck; die Zeitzonen-Semantik des Servers bleibt offen.
+- Die Testinstanz fuehrt 9 Collections (4 dynamisch, 5 statisch). Seitenabrufe liefern
+  `cursor` nur auf nicht-letzten Seiten; 14 Assets wurden ueber 3 Seiten gelesen.
+- Diese Instanz hat keine Custom-Felder mit `editType` `number` oder `boolean`; diese
+  Typen bleiben ungeprueft.
+
+**Noch offen in Phase 1:** archivierte Assets (im Testsystem nicht vorhanden),
+Rate-Limits (kein Lasttest) und ausgeloeste Webhooks (kein Empfaenger).
 - Custom-Metadaten: `replace`/`remove` funktionieren mit Feld-IDs und mit
   Optionsnamen; ein unbekanntes Feld meldet `The custom metadata field does not exist.`
 - Standard-Metadaten: nur ein Teil der Felder ist editierbar. Schreibbar sind die im
