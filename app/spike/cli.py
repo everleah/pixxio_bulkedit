@@ -1,6 +1,7 @@
 """Kommandozeile der Phase-1-Pruefungen.
 
-Ausschliesslich lesend: es werden keine Dateien veraendert, angelegt oder geloescht.
+Lesezugriffe sind immer erlaubt. Schreibzugriffe (``fixtures``, ``probe``) laufen
+ausschliesslich auf Assets aus dem lokalen Ledger und nur bei ``PXTEST_IS_DEV=true``.
 """
 
 from __future__ import annotations
@@ -10,12 +11,13 @@ import json
 import sys
 import time
 from collections.abc import Sequence
+from dataclasses import asdict
 from typing import Any
 
 from pixxio_client.exceptions import PIXXIOException
 from pydantic import ValidationError
 
-from app.spike.client import PAGE_SIZE, build_client
+from app.spike.client import FILES_PAGE_SIZE, METADATA_PAGE_SIZE, build_client
 from app.spike.discovery import (
     fetch_collection,
     fetch_custom_fields,
@@ -28,13 +30,13 @@ from app.spike.discovery import (
     summarize_schema,
     summarize_user,
 )
+from app.spike.errors import SpikeError
+from app.spike.ledger import Ledger
+from app.spike.probe import cleanup_fixtures, create_fixtures, run_write_checks
 from app.spike.settings import SpikeSettings, get_spike_settings
 
 DEFAULT_FILE_LIMIT = 5
-
-
-class SpikeError(Exception):
-    """Fachlicher Abbruch einer Spikepruefung."""
+DEFAULT_FIXTURE_COUNT = 2
 
 
 def _load_settings() -> SpikeSettings:
@@ -46,6 +48,10 @@ def _load_settings() -> SpikeSettings:
             "PXTEST_HOST, PXTEST_API_KEY und PXTEST_COLLECTION_ID muessen gesetzt sein "
             f"({details})."
         ) from exc
+
+
+def _ledger(settings: SpikeSettings) -> Ledger:
+    return Ledger(settings.ledger_path)
 
 
 def _emit(payload: dict[str, Any], as_json: bool, lines: list[str]) -> None:
@@ -60,14 +66,15 @@ def _seconds(started: float) -> str:
     return f"{time.perf_counter() - started:.2f}s"
 
 
-def command_whoami(args: argparse.Namespace) -> None:
+def command_whoami(args: argparse.Namespace) -> int:
     client = build_client(_load_settings())
     user = summarize_user(fetch_user(client))
     lines = [f"API-User: {user['displayName']} (id {user['id']})"]
     _emit({"user": user}, args.json, lines)
+    return 0
 
 
-def command_collection(args: argparse.Namespace) -> None:
+def command_collection(args: argparse.Namespace) -> int:
     settings = _load_settings()
     client = build_client(settings)
     collection = summarize_collection(fetch_collection(client, settings.collection_id))
@@ -76,13 +83,15 @@ def command_collection(args: argparse.Namespace) -> None:
         f"Host: {settings.host}",
         f"Collection: {collection['name']} (id {collection['id']})",
         f"isDynamic: {collection['isDynamic']} | filesQuantity: {collection['filesQuantity']}",
-        f"Treffer laut Dateiliste: {quantity} | pageSize-Maximum: {PAGE_SIZE}",
+        f"Treffer laut Dateiliste: {quantity}",
+        f"pageSize-Maximum: files {FILES_PAGE_SIZE}, customMetadata {METADATA_PAGE_SIZE}",
     ]
     payload = {"host": settings.host, "collection": collection, "quantity": quantity}
     _emit(payload, args.json, lines)
+    return 0
 
 
-def command_schema(args: argparse.Namespace) -> None:
+def command_schema(args: argparse.Namespace) -> int:
     client = build_client(_load_settings())
     custom_fields = fetch_custom_fields(client)
     standard_fields = fetch_standard_fields(client)
@@ -96,9 +105,10 @@ def command_schema(args: argparse.Namespace) -> None:
     ]
     payload = {"schema": schema, "custom_fields": custom_fields}
     _emit(payload, args.json, lines)
+    return 0
 
 
-def command_files(args: argparse.Namespace) -> None:
+def command_files(args: argparse.Namespace) -> int:
     settings = _load_settings()
     client = build_client(settings)
     page = fetch_files_page(client, settings.collection_id, args.limit)
@@ -113,9 +123,10 @@ def command_files(args: argparse.Namespace) -> None:
             lines.append(f"    gefuellte Custom-Felder: {row['customFilled']}")
     payload = {"collection_id": settings.collection_id, "files": rows}
     _emit(payload, args.json, lines)
+    return 0
 
 
-def command_report(args: argparse.Namespace) -> None:
+def command_report(args: argparse.Namespace) -> int:
     settings = _load_settings()
     client = build_client(settings)
     lines = [
@@ -126,7 +137,8 @@ def command_report(args: argparse.Namespace) -> None:
         "host": settings.host,
         "collection_id": settings.collection_id,
         "is_dev": settings.is_dev,
-        "page_size_max": PAGE_SIZE,
+        "files_page_size_max": FILES_PAGE_SIZE,
+        "metadata_page_size_max": METADATA_PAGE_SIZE,
     }
 
     started = time.perf_counter()
@@ -163,47 +175,118 @@ def command_report(args: argparse.Namespace) -> None:
         )
     payload["files"] = rows
     _emit(payload, args.json, lines)
+    return 0
+
+
+def command_status(args: argparse.Namespace) -> int:
+    settings = _load_settings()
+    ledger = _ledger(settings)
+    entries = ledger.load()
+    lines = [
+        f"Ledger: {ledger.path}",
+        f"Eigene Test-Assets: {len(entries)}",
+    ]
+    for entry in entries:
+        lines.append(f"- {entry.asset_id} {entry.file_name} ({entry.created_at})")
+    payload = {"ledger": str(ledger.path), "entries": [asdict(entry) for entry in entries]}
+    _emit(payload, args.json, lines)
+    return 0
+
+
+def command_fixtures_create(args: argparse.Namespace) -> int:
+    settings = _load_settings()
+    client = build_client(settings)
+    entries = create_fixtures(client, settings, _ledger(settings), args.count)
+    lines = [f"Angelegt: {len(entries)} Testdateien"]
+    for entry in entries:
+        lines.append(f"- {entry.asset_id} {entry.file_name}")
+    payload = {"created": [asdict(entry) for entry in entries]}
+    _emit(payload, args.json, lines)
+    return 0
+
+
+def command_fixtures_delete(args: argparse.Namespace) -> int:
+    settings = _load_settings()
+    client = build_client(settings)
+    deleted = cleanup_fixtures(client, settings, _ledger(settings))
+    if not deleted:
+        lines = ["Keine eigenen Test-Assets im Ledger."]
+    else:
+        lines = [f"Geloescht: {deleted}"]
+    _emit({"deleted": deleted}, args.json, lines)
+    return 0
+
+
+def command_probe(args: argparse.Namespace) -> int:
+    settings = _load_settings()
+    client = build_client(settings)
+    results = run_write_checks(client, settings, _ledger(settings))
+    failures = [result for result in results if not result.ok]
+    lines = [f"Schreibpruefungen: {len(results) - len(failures)}/{len(results)} ohne Abweichung"]
+    for result in results:
+        status = "OK" if result.ok else "ABWEICHUNG"
+        lines.append(f"- [{status}] {result.name}: {result.detail}")
+    _emit({"results": [asdict(result) for result in results]}, args.json, lines)
+    return 0 if not failures else 1
+
+
+def _json_parent() -> argparse.ArgumentParser:
+    parent = argparse.ArgumentParser(add_help=False)
+    parent.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
+    return parent
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m app.spike",
-        description="Phase-1-Pruefungen gegen ein pixx.io-Testsystem (nur lesend)",
+        description="Phase-1-Pruefungen gegen ein pixx.io-Testsystem",
     )
-    parser.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
+    json_parent = _json_parent()
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("whoami", help="API-Benutzer des Keys anzeigen").set_defaults(
-        handler=command_whoami
-    )
-    subparsers.add_parser("collection", help="Collection und Trefferzahl anzeigen").set_defaults(
-        handler=command_collection
-    )
-    subparsers.add_parser("schema", help="Metadatenfelder und editTypes anzeigen").set_defaults(
-        handler=command_schema
-    )
-    files_parser = subparsers.add_parser("files", help="Beispieldateien mit Werten anzeigen")
+    def add(name: str, help_text: str, handler: Any) -> argparse.ArgumentParser:
+        subparser = subparsers.add_parser(name, help=help_text, parents=[json_parent])
+        subparser.set_defaults(handler=handler)
+        return subparser
+
+    add("whoami", "API-Benutzer des Keys anzeigen", command_whoami)
+    add("collection", "Collection und Trefferzahl anzeigen", command_collection)
+    add("schema", "Metadatenfelder und editTypes anzeigen", command_schema)
+    files_parser = add("files", "Beispieldateien mit Werten anzeigen", command_files)
     files_parser.add_argument(
         "--limit",
         type=int,
         default=DEFAULT_FILE_LIMIT,
-        help=f"Anzahl Beispieldateien (maximal {PAGE_SIZE})",
+        help=f"Anzahl Beispieldateien (maximal {FILES_PAGE_SIZE})",
     )
-    files_parser.set_defaults(handler=command_files)
-    subparsers.add_parser("report", help="Alle Lesepruefungen mit Laufzeiten").set_defaults(
-        handler=command_report
+    add("report", "Alle Lesepruefungen mit Laufzeiten", command_report)
+    add("status", "Ledger der eigenen Test-Assets anzeigen", command_status)
+    add("probe", "Schreibpruefungen auf eigenen Test-Assets ausfuehren", command_probe)
+
+    fixtures_parser = subparsers.add_parser(
+        "fixtures", help="Eigene Testdateien anlegen und entfernen"
     )
+    fixture_commands = fixtures_parser.add_subparsers(dest="fixture_command", required=True)
+    create_parser = fixture_commands.add_parser(
+        "create", help="Testdateien anlegen", parents=[json_parent]
+    )
+    create_parser.add_argument("--count", type=int, default=DEFAULT_FIXTURE_COUNT)
+    create_parser.set_defaults(handler=command_fixtures_create)
+    delete_parser = fixture_commands.add_parser(
+        "delete", help="Alle Assets aus dem Ledger loeschen", parents=[json_parent]
+    )
+    delete_parser.set_defaults(handler=command_fixtures_delete)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        args.handler(args)
+        outcome = args.handler(args)
     except SpikeError as exc:
         print(f"Fehler: {exc}", file=sys.stderr)
         return 1
     except PIXXIOException as exc:
         print(f"API-Fehler: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
-    return 0
+    return int(outcome or 0)

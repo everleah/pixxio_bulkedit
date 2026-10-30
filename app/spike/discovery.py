@@ -14,7 +14,7 @@ from pixxio_client.files import File
 from pixxio_client.metadata import CustomMetadata, StandardMetadata
 from pixxio_client.users import User
 
-from app.spike.client import PAGE_SIZE
+from app.spike.client import FILES_PAGE_SIZE, METADATA_PAGE_SIZE
 
 COLLECTION_FIELDS: list[str] = ["id", "name", "isDynamic", "filesQuantity"]
 SCHEMA_FIELDS: list[str] = ["id", "name", "editType", "selectionOptions"]
@@ -79,13 +79,14 @@ def fetch_custom_fields(client: Client) -> list[dict[str, Any]]:
     """Custom-Metadaten inklusive editType und Auswahloptionen."""
     custom = CustomMetadata(client)
     custom.set_response_fields(SCHEMA_FIELDS)
-    return [as_dict(field) for field in custom.get_all(page_size=PAGE_SIZE)]
+    return [as_dict(field) for field in custom.get_all(page_size=METADATA_PAGE_SIZE)]
 
 
 def fetch_standard_fields(client: Client) -> list[dict[str, Any]]:
+    """Standard-Metadaten; dieser Endpunkt liefert alle Felder ohne Paging."""
     standard = StandardMetadata(client)
     standard.set_response_fields(STANDARD_SCHEMA_FIELDS)
-    return [as_dict(field) for field in standard.get_all(page_size=PAGE_SIZE)]
+    return [as_dict(field) for field in standard.get_all()]
 
 
 def _count_by(fields: list[dict[str, Any]], key: str) -> dict[str, int]:
@@ -115,7 +116,7 @@ def summarize_schema(
 
 
 def fetch_files_page(client: Client, collection_id: int, limit: int) -> dict[str, Any]:
-    page_size = max(1, min(limit, PAGE_SIZE))
+    page_size = max(1, min(limit, FILES_PAGE_SIZE))
     return as_dict(File(client).get(pageSize=page_size, filter=collection_filter(collection_id)))
 
 

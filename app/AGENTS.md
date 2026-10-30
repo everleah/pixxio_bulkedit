@@ -19,8 +19,11 @@
   Schutz des letzten aktiven Superusers.
 - `colors.py`: Meadow-Palette und WCAG-Kontrastberechnung.
 - `cli.py` mit `__main__.py`: `init-db`, `generate-master-key`, `create-superuser`, `serve`.
-- `spike/`: Machbarkeitspruefungen der Phase 1 gegen ein Testsystem, ausschliesslich
-  lesend (`settings.py` fuer `PXTEST_*`, `client.py`, `discovery.py`, `cli.py`).
+- `spike/`: Machbarkeitspruefungen der Phase 1 gegen ein Testsystem. `settings.py` liest
+  `PXTEST_*`, `client.py` haelt die Seitenlimits, `discovery.py` liest Schema und Werte,
+  `ledger.py` fuehrt selbst angelegte Test-Assets, `guard.py` setzt die Schutzgrenze,
+  `fixtures.py` erzeugt lokale PNG-Testdateien, `probe.py` enthaelt Anlage, Schreibpruefungen
+  und Aufraeumen.
 - `main.py`: NiceGUI-Start, Anmeldung und Session-Ablauf.
 - `alembic.ini` und `migrations/`: root-owned; Schemaaenderungen laufen ausschliesslich
   ueber Alembic-Revisionen.
@@ -35,10 +38,14 @@
 - Zeitstempel werden in UTC ueber `utc_now` geschrieben.
 - Fachliche Kennungen englisch im Code; Docstrings und UI-Texte deutsch.
 - Keine Live-Schreibaufrufe gegen pixx.io ohne freigegebene File-ID-Liste.
-- `app/spike/` ist ausschliesslich lesend. Schreibpruefungen duerfen nur Assets
-  betreffen, die der Spike selbst anlegt (Ledger plus Mitgliedschaft in
-  `PXTEST_COLLECTION_ID`), und nur bei `PXTEST_IS_DEV=true`.
-- `pageSize` der API ist auf 50 begrenzt; `PAGE_SIZE` aus `app/spike/client.py` nutzen.
+- Schreibzugriffe im Spike nur ueber `assert_write_allowed` (Ledger plus Collection) und
+  nur bei `PXTEST_IS_DEV=true`; Loeschungen ueber `assert_deletion_allowed` (nur Ledger).
+- Ein unlesbares Ledger wird nie stillschweigend zurueckgesetzt, sondern als Fehler
+  gemeldet.
+- Standard-Metadaten nur auf Feldern schreiben, die das Asset fuehrt; die Editierbarkeit
+  ist im Schema nicht erkennbar.
+- `pageSize`: `files` bis 500, `customMetadata` bis 50, `standardMetadata` ohne Paging
+  (`FILES_PAGE_SIZE`/`METADATA_PAGE_SIZE` aus `app/spike/client.py` nutzen).
 
 ## Work Guidance
 

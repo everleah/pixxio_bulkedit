@@ -6,6 +6,8 @@ zu den Machbarkeitspruefungen, nicht zur Anwendung.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,6 +28,7 @@ class SpikeSettings(BaseSettings):
     collection_id: int = Field(gt=0)
     # Nur auf einem Testsystem duerfen Testdaten angelegt und geloescht werden.
     is_dev: bool = False
+    ledger_path: Path = Path("data") / "spike" / "ledger.json"
 
     @field_validator("host")
     @classmethod
@@ -34,6 +37,11 @@ class SpikeSettings(BaseSettings):
         if not cleaned:
             raise ValueError("PXTEST_HOST darf nicht leer sein")
         return cleaned
+
+    @field_validator("ledger_path")
+    @classmethod
+    def _resolve_ledger_path(cls, value: Path) -> Path:
+        return value.expanduser().resolve()
 
 
 def get_spike_settings() -> SpikeSettings:

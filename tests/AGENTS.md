@@ -15,6 +15,8 @@
   Migrationen, Kommandozeile, Farbkontrast.
 - `test_spike.py`: Phase-1-Spikepruefungen ohne Netzzugriff; die `summarize_*`-Funktionen
   arbeiten auf nachgebauten Antwortobjekten.
+- `test_spike_write.py`: Ledger, Schutzgrenze, PNG-Testdateien, Payload-Aufbau und
+  CLI-Abbrueche des Schreibpfads; ebenfalls ohne Netzzugriff.
 
 ## Local Contracts
 

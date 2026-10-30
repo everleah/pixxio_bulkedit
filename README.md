@@ -97,7 +97,8 @@ Anwendungskonfiguration nicht:
 | `PXTEST_HOST` | Host des Testsystems |
 | `PXTEST_API_KEY` | API-Key des Testsystems (nie im Repo) |
 | `PXTEST_COLLECTION_ID` | Collection fuer die Pruefungen |
-| `PXTEST_IS_DEV` | `true` nur auf einem Testsystem; Voraussetzung fuer Testdaten |
+| `PXTEST_IS_DEV` | `true` nur auf einem Testsystem; Voraussetzung fuer Schreibzugriffe |
+| `PXTEST_LEDGER_PATH` | optional, Standard `data/spike/ledger.json` |
 
 ```powershell
 .\.venv\Scripts\python.exe -m app.spike report
@@ -105,13 +106,21 @@ Anwendungskonfiguration nicht:
 .\.venv\Scripts\python.exe -m app.spike collection
 .\.venv\Scripts\python.exe -m app.spike schema --json
 .\.venv\Scripts\python.exe -m app.spike files --limit 10
+.\.venv\Scripts\python.exe -m app.spike fixtures create --count 2
+.\.venv\Scripts\python.exe -m app.spike probe
+.\.venv\Scripts\python.exe -m app.spike status
+.\.venv\Scripts\python.exe -m app.spike fixtures delete
 ```
 
-`report` ruft API-Benutzer, Collection, Schema und Beispieldateien ab und zeigt
-Laufzeiten; `--json` liefert maschinenlesbare Ausgabe. Es wird ausschliesslich
-gelesen. Schreibpruefungen folgen spaeter und duerfen nur Assets betreffen, die der
-Spike selbst anlegt: IDs im lokalen Ledger, zusaetzlich Mitgliedschaft in
-`PXTEST_COLLECTION_ID`, nur bei `PXTEST_IS_DEV=true`.
+`report`, `whoami`, `collection`, `schema` und `files` lesen nur. `fixtures create`
+legt eigene PNG-Testdateien in der Collection an und protokolliert ihre IDs in
+`data/spike/ledger.json`; `probe` schreibt ausschliesslich auf Assets aus diesem
+Ledger (zusaetzlich muessen sie in `PXTEST_COLLECTION_ID` liegen) und prueft
+Mehrfach-Payload, Einzel-ID, Auswahl, Mehrfachauswahl, Standard-Metadaten, Entfernen,
+`truncateSubject`, Keywords und Fehlerdetails. `fixtures delete` entfernt die
+Ledger-Assets und verifiziert die Loeschung ueber die Collection. Ohne
+`PXTEST_IS_DEV=true` werden Anlegen, Schreiben und Loeschen verweigert.
+`data/` ist von Git ausgeschlossen.
 
 ## Code-Quality-Gates
 

@@ -141,9 +141,11 @@ Dateianlage und -loeschung sind nur bei `PXTEST_IS_DEV=true` erlaubt und dienen
 allein der Testdatenvorbereitung. Manuell freigegebene File-IDs koennen spaeter
 ergaenzt werden; eine Collection allein bleibt keine Schutzgrenze.
 
-**Erste Befunde (Test-System `hoerl-demo.px.media`, Client 0.4.3):**
+**Erste Befunde (Test-System `hoerl-demo.px.media`, Client 0.4.3, 30.10.2026):**
 
-- `pageSize` ist auf 50 begrenzt; der Client-Default 100 wird abgelehnt.
+- `pageSize`: `files` bis 500, `customMetadata` bis 50, `collections` mindestens 50,
+  `standardMetadata` akzeptiert gar kein `pageSize` (nicht gepaged). Der Client-Default
+  100 laesst `CustomMetadata.get_all()` und damit `CustomMetadataBuilder` scheitern.
 - `CustomMetadata.get_all()` liefert `editType` und Auswahloptionen erst nach
   `set_response_fields(["id", "name", "editType", "selectionOptions"])`.
 - Die Einzelabfrage einer Collection liefert `isDynamic` und `filesQuantity` nicht;
@@ -151,6 +153,20 @@ ergaenzt werden; eine Collection allein bleibt keine Schutzgrenze.
 - `users/current` liefert `{success, user: {id, displayName}}`.
 - Der Client wiederholt GET/PUT/DELETE bei 429/503, POST nie. Fuer den Writer ist
   deshalb zu entscheiden, ob PUT-Wiederholungen unklare Ergebnisse wiederholen.
+- Upload antwortet mit `{fileID, isDuplicate, storageUsage}`; `fileName` wird ohne
+  Endung uebergeben (die API ergaenzt sie), und identischer Inhalt wird als Duplikat
+  erkannt.
+- `filesPut` beantwortet eine einzelne ID synchron ohne Job; mehrere IDs erzeugen einen
+  Job (`jobType filesPut` mit `success`/`error`). `modifyDate` aendert sich durch den
+  Schreibvorgang und traegt damit die Konflikterkennung.
+- Custom-Metadaten: `replace`/`remove` funktionieren mit Feld-IDs und mit
+  Optionsnamen; ein unbekanntes Feld meldet `The custom metadata field does not exist.`
+- Standard-Metadaten: nur ein Teil der Felder ist editierbar. Schreibbar sind die im
+  Asset gefuehrten Standardfelder (z. B. `AltTextAccessibility`, `Caption-Abstract`);
+  XMP-/AO-/AI-Felder melden `does not exist or is not editable`. Die Editierbarkeit
+  ist im Schema nicht erkennbar.
+- `filesDelete` nennt die geloeschten IDs nicht zuverlaessig; die Loeschung ist ueber
+  eine Collection-Abfrage inklusive Archiv zu verifizieren.
 - Die Testcollection `chub` (id 614405567) ist statisch und enthaelt 4 Assets mit
   19 Custom- und 376 Standard-Metadatenfeldern; die Custom-Felder sind derzeit leer.
 
