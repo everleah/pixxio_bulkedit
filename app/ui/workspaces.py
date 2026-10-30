@@ -18,7 +18,7 @@ from nicegui import run, ui
 from sqlalchemy import select
 
 from app.clients import ClientFactory
-from app.colors import PALETTE
+from app.colors import PALETTE, TEXT_STYLE
 from app.crypto import SecretBox
 from app.db import SessionFactory, session_scope
 from app.i18n import describe_error, get_locale, t
@@ -543,7 +543,7 @@ def register_workspace_pages(
                     ui.label(t("{count} Zeilen", count=item["rows"])).classes("w-24 text-xs")
                     ui.label(t("{count} Änderungen", count=item["changed"])).classes("w-28 text-xs")
                     ui.label(item["updated"]).classes("w-32 text-xs")
-                    ui.label(item["expiry"]).classes("w-44 text-xs text-warning")
+                    ui.label(item["expiry"]).classes("w-44 text-xs").style(TEXT_STYLE["warning"])
                     action_button(
                         "grid_on",
                         t("Öffnen"),
@@ -574,12 +574,12 @@ def register_workspace_pages(
             workspace = owned_workspace(session, workspace_id, user)
             if workspace is None:
                 page_header(t("Arbeitsbestände"), user)
-                ui.label(t("Der Arbeitsbestand wurde nicht gefunden.")).classes("text-negative")
+                ui.label(t("Der Arbeitsbestand wurde nicht gefunden.")).style(TEXT_STYLE["error"])
                 return
             profile = session.get(Profile, workspace.profile_id)
             if profile is None:
                 page_header(t("Arbeitsbestände"), user)
-                ui.label(t("Das Profil fehlt.")).classes("text-negative")
+                ui.label(t("Das Profil fehlt.")).style(TEXT_STYLE["error"])
                 return
             name = workspace.name or t("Arbeitsbestand {id}", id=workspace.id)
             workspace_status = workspace.status
@@ -610,8 +610,8 @@ def register_workspace_pages(
             )
         ).classes("text-sm")
         if workspace_status is not WorkspaceStatus.READY:
-            ui.label(t("Status: {status}", status=workspace_status.value)).classes(
-                "text-warning text-sm"
+            ui.label(t("Status: {status}", status=workspace_status.value)).classes("text-sm").style(
+                TEXT_STYLE["warning"]
             )
         if warning is not None:
             ui.label(
@@ -620,7 +620,7 @@ def register_workspace_pages(
                     days=warning,
                     threshold=EXPIRY_WARNING_DAYS,
                 )
-            ).classes("text-negative text-sm")
+            ).classes("text-sm").style(TEXT_STYLE["error"])
         ui.label(
             t("Der Entwurf wurde in einem anderen Tab geändert. Bitte die Seite neu laden.")
         ).classes("ws-conflict").props('id="ws-conflict"')

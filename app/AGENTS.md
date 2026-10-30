@@ -17,7 +17,9 @@
   Admin-Audit.
 - `auth.py`: Argon2id-Hashes, Rollen und Rechte, Login-Drosselung, Session-Helfer,
   Schutz des letzten aktiven Superusers.
-- `colors.py`: Meadow-Palette und WCAG-Kontrastberechnung.
+- `colors.py`: Meadow-Palette und WCAG-Kontrastberechnung; `TEXT_STYLE`/`text_style`
+  liefern kontraststarke Textfarben (≥ 4.5:1 auf dem Seitenhintergrund), `FOCUS_CSS`
+  den sichtbaren Fokusrahmen.
 - `schema.py`: Profilschema mit `ColumnDef` (Schluessel `std:*`, `custom:<id>`,
   `standard:<id>`), `resolve_columns` (IDs oder Namen), `SchemaCache` mit TTL;
   `fetch_file_states` liefert die Dateistatus-Werte als Optionen von `std:fileStateID`.
@@ -64,7 +66,9 @@
   `runner.py` misst Datenbankverhalten, `grid.py` stellt den Grid-Prototyp unter `/bench`
   bereit, `cli.py` berichtet.
 - `main.py`: NiceGUI-Start, Anmeldung, Session-Ablauf; registriert die Admin-Seiten und
-  gibt `SecretBox`/`ClientFactory` als Anwendungszustand weiter.
+  gibt `SecretBox`/`ClientFactory` als Anwendungszustand weiter. `GET /health` prueft die
+  Datenbank und liefert Version und Status (Docker/Traefik), `on_shutdown` protokolliert
+  das Beenden. Host und Port kommen aus `BULKEDIT_HOST`/`BULKEDIT_PORT`.
 - `alembic.ini` und `migrations/`: root-owned; Schemaaenderungen laufen ausschliesslich
   ueber Alembic-Revisionen.
 
@@ -126,6 +130,9 @@
   entstehen getrennt davon.
 - UI-Farben ausschliesslich aus `app/colors.py` beziehen, auch fuer AG Grid
   (`--ag-*`-Variablen auf dem Grid-Container).
+- Statusfarben nie ueber Quasars `text-positive`/`text-negative`/`text-warning` setzen,
+  sondern ueber `TEXT_STYLE[...]`/`text_style(...)`: Die Planfarben sind Flaechenfarben und
+  als Text zu hell. Status wird zusaetzlich immer als Text ausgegeben.
 - Sichtbare Texte laufen ueber `t(...)` aus `app/i18n.py`: deutscher Quelltext mit echten
   Umlauten als Schluessel, englische Uebersetzung im Katalog. Neue Texte immer in beiden
   Sprachen ergaenzen (`test_jeder_text_ist_uebersetzt` prueft die Vollstaendigkeit).

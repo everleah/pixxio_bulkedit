@@ -212,6 +212,11 @@ data/
 *.sqlite3-wal
 *.sqlite3-shm
 
+# Deployment und Sicherungen
+backups/
+backup.key
+.env.vps
+
 # PyPI configuration file
 .pypirc
 

@@ -302,6 +302,58 @@ sichtbar. Farben und Kopfzeilenverlauf stammen aus `app/colors.py`. Der erste St
 die Datenbank unter `%TEMP%` an; weitere Starts verwenden sie wieder. Die Route ist nur
 Teil des Lastnachweises, nicht der Anwendung.
 
+## Deployment (Docker, Forgejo, Traefik)
+
+Das Image enthält Anwendung, Migrationen und Abhängigkeiten; beim Start läuft
+`alembic upgrade head`, danach startet `python -m app serve`.
+
+```powershell
+.\push-to-forgejo.ps1 -Tag 0.2.0        # bauen und nach git.claudiapps.de pushen
+```
+
+Auf dem VPS liegen `docker-compose.vps.yml`, `deploy-vps.sh`, `backup.sh`, `restore.sh`
+und eine `.env` (Vorlage: `.env.vps.example`) in einem Ordner:
+
+```bash
+./deploy-vps.sh            # Image ziehen, Container neu starten, Healthcheck abwarten
+./deploy-vps.sh --backup   # zusätzlich vorher sichern (Empfehlung bei Updates)
+```
+
+- Traefik übernimmt HTTPS und Routing über das externe Netz `him-net`
+  (`BULKEDIT_HOST=bulkedit.vcs1.him-tools.de`), Zertifikate über `letsencrypt`.
+- Persistente Daten liegen in den Volumes `bulkedit_data` (`/data`) und
+  `bulkedit_nicegui` (`/app/.nicegui`), nicht im Image.
+- Secrets kommen ausschließlich aus der `.env` (`BULKEDIT_MASTER_KEY`,
+  `BULKEDIT_STORAGE_SECRET`); ohne gültige Konfiguration startet die Anwendung nicht.
+- Healthcheck: `GET /health` prüft die Datenbank und liefert Version und Status;
+  Docker und Traefik nutzen ihn. Logs sind auf 10 MB × 5 Dateien begrenzt.
+- Herunterfahren: `stop_grace_period` 30 s; laufende Schreibvorgänge werden nicht neu
+  gesendet — nach dem Start in `/runs` „Status abgleichen“ ausführen.
+
+## Sicherung und Wiederherstellung
+
+Es gibt keinen automatischen Backup-Dienst. Gesichert wird manuell und verschlüsselt:
+
+```bash
+openssl rand -base64 48 > backup.key && chmod 600 backup.key   # einmal, getrennt aufbewahren
+./backup.sh /pfad/ausserhalb-des-vps                            # konsistente Kopie + Verschlüsselung
+./restore.sh --check backups/bulkedit-20261030T120000Z.tar.gz.enc
+./restore.sh backups/bulkedit-20261030T120000Z.tar.gz.enc      # Container stoppen, Daten ersetzen
+```
+
+- `backup.sh` erzeugt die Datenbankkopie über die SQLite-Backup-API im Container (auch bei
+  laufender Anwendung konsistent), prüft `PRAGMA integrity_check` und verschlüsselt das
+  Archiv mit OpenSSL (AES-256-CBC, PBKDF2).
+- `BULKEDIT_MASTER_KEY` und `BULKEDIT_STORAGE_SECRET` gehören **nicht** ins Archiv und
+  werden getrennt aufbewahrt; ohne Master-Key sind gespeicherte API-Keys unlesbar.
+- Vor migrationspflichtigen Updates sichern (`./deploy-vps.sh --backup`).
+- Wiederherstellung wurde in einer leeren Umgebung getestet: neues Volume, Archiv
+  einspielen, Anmeldung mit dem gesicherten Benutzer.
+- Bereits in pixx.io wirksame Änderungen verschwinden durch einen Restore nicht;
+  unklare Aufträge nach dem Restore über `/runs` abgleichen.
+- Aufbewahrung abstimmen: Feldwerte verschwinden nach 90 Tagen
+  (`python -m app purge-history`), Sicherungen entsprechend länger oder kürzer halten.
+
 ## Code-Quality-Gates
 
 Die empfohlenen VS-Code-Erweiterungen sind Python, Pylance und Ruff.
@@ -322,5 +374,6 @@ Alternativ:
 
 Alle Befehle muessen erfolgreich sein. Pyright ist das ausfuehrbare CLI-Typgate;
 Pylance liefert zusaetzlich die Editor-Diagnostik. Die Tests pruefen Konfiguration,
-Verschluesselung, Rollen und Rechte, Datenbank und Migrationen, Kommandozeile sowie
-Farbkontrast; Script-Isolation, Lastziele und Live-API bleiben offen.
+Verschluesselung, Rollen und Rechte, Datenbank und Migrationen, Kommandozeile,
+Farbkontrast und Deployment-Artefakte; Script-Isolation, Lastziele und Live-API bleiben
+offen.

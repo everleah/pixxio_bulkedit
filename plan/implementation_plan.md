@@ -569,6 +569,31 @@ App-Restore nicht; unklare Auftraege muessen anschliessend abgeglichen werden.
 Installation, Update und Wiederherstellung sind nachvollziehbar getestet; das System
 ist ueber HTTPS erreichbar.
 
+**Umgesetzt (30.10.2026):** Farben bleiben zentral in `app/colors.py` und entsprechen der
+Tabelle. Fuer Text und gefuellte Schaltflaechen gibt es kontraststarke Varianten
+(`text_success #15803d`, `text_warning #b45309`, `text_error #b91c1c`, `text_info #0369a1`,
+`action #15803d`, gedämpft `text_muted #475569`), weil die Flaechenfarben als Text nur
+2.1–2.9:1 erreichen; `TEXT_STYLE`/`text_style` setzen sie, `FOCUS_CSS` liefert einen
+sichtbaren Fokusrahmen. Status wird zusaetzlich immer als Text gezeigt. Tests:
+`test_palette_entspricht_dem_plan`, Kontrastpruefungen fuer Status, Schaltflaechen und
+Fokus.
+Deployment: `Dockerfile` (python:3.14-slim, Migrationen im Image, `HEALTHCHECK` auf
+`/health`), `.dockerignore`, `docker-compose.vps.yml` (Image
+`git.claudiapps.de/hoerl-im/pixxio_bulkedit`, Traefik-Netz `him-net`, Host
+`bulkedit.vcs1.him-tools.de`, Volume `/data`, Loggrenzen, `stop_grace_period`),
+`.env.vps.example`, `push-to-forgejo.ps1` und `deploy-vps.sh` (Healthcheck-Abfrage,
+optionales Backup vor Updates). Die Anwendung liefert `GET /health` (Datenbankpruefung,
+Version) und beendet sich mit einem Shutdown-Protokolleintrag. Lokal geprueft: Image
+gebaut, Container startet migrationsfrei von 0 auf `0002`, Healthcheck `healthy`,
+`/health` = `{"status":"ok","version":"0.1.0"}`, Compose-Konfiguration rendert die
+Traefik-Regeln. Nicht lokal pruefbar: Push in die Forgejo-Registry und Deployment auf dem
+VPS (Zugangsdaten).
+Backups: `backup.sh` (SQLite-Backup-API im Container, `integrity_check`, OpenSSL
+AES-256-CBC/PBKDF2, Schluessel in `backup.key`), `restore.sh` mit `--check` und
+Volume-Ersetzung. Geprueft: Sicherung aus laufendem Container, `--check` meldet
+14 Tabellen und Schema-Version 0002, Wiederherstellung in eine leere Umgebung
+(neues Volume, neuer Container) inklusive Anmeldung mit dem gesicherten Benutzer.
+
 ## 12. Produktivfreigabe
 
 Freigabe erst nach:

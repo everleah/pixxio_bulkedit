@@ -12,6 +12,7 @@ from typing import Any
 from nicegui import run, ui
 from sqlalchemy import select
 
+from app.colors import TEXT_STYLE
 from app.crypto import SecretBox
 from app.db import SessionFactory, session_scope
 from app.i18n import describe_error, t
@@ -235,8 +236,8 @@ def register_script_pages(
                     ]
             except ScriptError as exc:
                 page_header(t("Scripts"), user)
-                ui.label(t("Fehler: {message}", message=describe_error(exc))).classes(
-                    "text-negative"
+                ui.label(t("Fehler: {message}", message=describe_error(exc))).style(
+                    TEXT_STYLE["error"]
                 )
                 return
         else:
@@ -247,8 +248,8 @@ def register_script_pages(
             ui.label(t("Angezeigt: v{version}", version=state["version"])).classes("text-xs")
         if state["template"]:
             ui.label(t("Vorlagen sind unveränderlich – bitte eine Kopie anlegen.")).classes(
-                "text-xs text-warning"
-            )
+                "text-xs"
+            ).style(TEXT_STYLE["warning"])
         status = ui.label("").classes("text-sm")
         log_box = ui.code("").classes("w-full")
         log_box.set_visibility(False)
@@ -262,7 +263,7 @@ def register_script_pages(
             profile_select.set_visibility(False)
             ui.label(
                 t("Keinem Profil zugeordnet – ein Superuser muss ein Profil zuweisen.")
-            ).classes("text-xs text-warning")
+            ).classes("text-xs").style(TEXT_STYLE["warning"])
 
         name_input = ui.input(t("Name"), value=state["script"] or "").props("outlined dense")
         name_input.set_visibility(script_id == 0)

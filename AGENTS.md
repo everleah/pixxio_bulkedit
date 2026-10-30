@@ -85,10 +85,13 @@ Default section order:
   Client-Factory, CLI, NiceGUI-Start); `app/ui/AGENTS.md`: Seiten und Zugriffsschutz.
 - `plan/AGENTS.md`: Fachkonzept, bestaetigter Umsetzungsplan und deren Vorrangregeln.
 - `tests/AGENTS.md`: Offline-Tests der Anwendung und der Entwicklungsbasis.
-- Root-owned: `README.md`, `LICENSE`, `.gitignore`, `.env.example`, `requirements*.txt`,
-  `pyproject.toml`, `.vscode/`, `alembic.ini` und `migrations/` (Alembic-Umgebung
-  und Revisionen). `.env.example` ist die einzige Vorlage; echte `.env`-Dateien
-  bleiben ungetrackt.
+- Root-owned: `README.md`, `LICENSE`, `.gitignore`, `.gitattributes`, `.env.example`,
+  `requirements*.txt`, `pyproject.toml`, `.vscode/`, `alembic.ini` und `migrations/`
+  (Alembic-Umgebung und Revisionen) sowie die Deployment-Dateien `Dockerfile`,
+  `.dockerignore`, `docker-compose.vps.yml`, `.env.vps.example`, `push-to-forgejo.ps1`,
+  `deploy-vps.sh`, `backup.sh` und `restore.sh`. `.env.example` und `.env.vps.example`
+  sind die einzigen Vorlagen; echte `.env`-Dateien, `backup.key` und `backups/` bleiben
+  ungetrackt.
 
 ## Development Environment
 
@@ -106,6 +109,13 @@ Default section order:
   `python -m app init-db` und `python -m app create-superuser --username ...`.
 - Ein pixx.io-Profil entsteht ueber `python -m app create-profile`; der API-Key kommt aus
   einer Umgebungsvariablen oder aus `.env` (`--api-key-env`), nie aus einem Argument.
+- Deployment: `.\push-to-forgejo.ps1` baut das Image und pusht es nach
+  `git.claudiapps.de/hoerl-im/pixxio_bulkedit`; auf dem VPS zieht `./deploy-vps.sh` das
+  Image (Traefik-Netz `him-net`, Host aus `BULKEDIT_HOST`). Shell-Skripte bleiben LF
+  (`.gitattributes`, `test_shell_skripte_haben_lf`).
+- Sicherungen laufen manuell: `./backup.sh` (konsistente SQLite-Kopie, `integrity_check`,
+  OpenSSL AES-256 mit `backup.key`), Wiederherstellung mit `./restore.sh [--check]`.
+  Master-Key und Storage-Secret werden getrennt gesichert.
 - Vor Abschluss relevanter Aenderungen die in `README.md` dokumentierten Gates
   ausfuehren: `pip check`, Ruff-Lint, Ruff-Formatcheck, Pyright und pytest, jeweils
   ueber `.\.venv\Scripts\python.exe -m ...`.

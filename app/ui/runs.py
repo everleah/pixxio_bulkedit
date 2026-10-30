@@ -10,6 +10,7 @@ from __future__ import annotations
 from nicegui import run, ui
 
 from app.clients import ClientFactory
+from app.colors import TEXT_STYLE, text_style
 from app.db import SessionFactory, session_scope
 from app.i18n import describe_error, t
 from app.models import AppUser, Profile, Run, WritePlan
@@ -33,10 +34,10 @@ LIST_ROUTE = "/runs"
 
 def _status_color(status: RunStatus) -> str:
     if status is RunStatus.OK:
-        return "text-positive"
+        return "success"
     if status is RunStatus.FAILED:
-        return "text-negative"
-    return "text-warning"
+        return "error"
+    return "warning"
 
 
 def _counts(summary: RunSummary) -> str:
@@ -78,14 +79,14 @@ def register_run_pages(
             ui.label(t("Es gibt noch keine Läufe.")).classes("text-sm")
         for summary in summaries:
             with ui.row().classes("w-full items-center gap-3 border-b py-1 text-sm"):
-                ui.label(str(summary.run.id)).classes("w-14 text-grey")
+                ui.label(str(summary.run.id)).classes("w-14").style(TEXT_STYLE["muted"])
                 ui.label(f"{summary.run.kind.value}/{summary.run.mode.value}").classes("w-32")
-                ui.label(str(summary.run.status.value)).classes(
-                    "w-24 " + _status_color(summary.run.status)
+                ui.label(str(summary.run.status.value)).classes("w-24").style(
+                    text_style(_status_color(summary.run.status))
                 )
                 ui.label(summary.workspace_name or "–").classes("w-40")
                 ui.label(summary.user_name or "–").classes("w-32")
-                ui.label(_counts(summary)).classes("flex-1 text-grey")
+                ui.label(_counts(summary)).classes("flex-1").style(TEXT_STYLE["muted"])
                 action_button(
                     "visibility",
                     t("Lauf öffnen"),
@@ -120,7 +121,7 @@ def register_run_pages(
             stored = session.get(Run, run_id)
             if stored is None:
                 page_header(t("Läufe"), user)
-                ui.label(t("Der Lauf wurde nicht gefunden.")).classes("text-negative")
+                ui.label(t("Der Lauf wurde nicht gefunden.")).style(TEXT_STYLE["error"])
                 return
             rows = [describe_change(row) for row in run_changes(session, stored.id)]
             header = (
@@ -138,22 +139,22 @@ def register_run_pages(
         if status is not RunStatus.OK:
             ui.label(
                 t("Nur wirksame Felder werden zurückgenommen; der Rest bleibt unberührt.")
-            ).classes("text-warning text-sm")
+            ).classes("text-sm").style(TEXT_STYLE["warning"])
 
         if not rows:
             ui.label(t("Dieser Lauf hat keine Feldänderungen.")).classes("text-sm")
         for row in rows:
             with ui.row().classes("w-full items-center gap-3 border-b py-1 text-sm"):
-                ui.label(row["file_id"]).classes("w-28 text-grey")
+                ui.label(row["file_id"]).classes("w-28").style(TEXT_STYLE["muted"])
                 ui.label(row["field"]).classes("w-56 font-medium")
-                ui.label(row["old"] or "–").classes("flex-1 text-grey")
-                ui.label("→").classes("text-grey")
+                ui.label(row["old"] or "–").classes("flex-1").style(TEXT_STYLE["muted"])
+                ui.label("→").style(TEXT_STYLE["muted"])
                 ui.label(row["new"] or "–").classes("flex-1")
-                ui.label(row["status"]).classes(
-                    "w-24 " + ("text-positive" if row["status"] == "ok" else "text-warning")
+                ui.label(row["status"]).classes("w-24").style(
+                    text_style("success" if row["status"] == "ok" else "warning")
                 )
                 if row["error"]:
-                    ui.label(row["error"]).classes("text-negative")
+                    ui.label(row["error"]).style(TEXT_STYLE["error"])
 
         ok_count = sum(1 for row in rows if row["status"] == "ok")
 

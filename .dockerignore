@@ -1,0 +1,25 @@
+# Build-Kontext klein halten: nur App, Migrationen und requirements
+.venv/
+data/
+tests/
+.nicegui/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.git/
+.github/
+.vscode/
+*.log
+*.md
+.env
+.env.*
+backups/
+docker-compose.vps.yml
+deploy-vps.sh
+backup.sh
+restore.sh
+push-to-forgejo.ps1
+!requirements.txt

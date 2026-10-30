@@ -1,0 +1,58 @@
+# docker-compose.vps.yml - pixx.io Bulk-Editor auf dem VPS (Traefik + Let's Encrypt)
+#
+# Verwendung auf dem Server (Datei und .env im selben Ordner):
+#   ./deploy-vps.sh
+#
+# Benoetigte .env-Werte: siehe .env.vps.example
+
+services:
+  bulkedit:
+    image: git.claudiapps.de/hoerl-im/pixxio_bulkedit:${BULKEDIT_TAG:-latest}
+    container_name: pixxio-bulkedit-vps
+    environment:
+      BULKEDIT_DB_PATH: /data/bulkedit.sqlite3
+      BULKEDIT_MASTER_KEY: ${BULKEDIT_MASTER_KEY}
+      BULKEDIT_STORAGE_SECRET: ${BULKEDIT_STORAGE_SECRET}
+      BULKEDIT_SESSION_TIMEOUT_MINUTES: ${BULKEDIT_SESSION_TIMEOUT_MINUTES:-60}
+      BULKEDIT_LOGIN_MAX_ATTEMPTS: ${BULKEDIT_LOGIN_MAX_ATTEMPTS:-5}
+      BULKEDIT_SCRIPT_TIMEOUT_SECONDS: ${BULKEDIT_SCRIPT_TIMEOUT_SECONDS:-60}
+      BULKEDIT_SCRIPT_MAX_OUTPUT_CHARS: ${BULKEDIT_SCRIPT_MAX_OUTPUT_CHARS:-20000}
+    volumes:
+      - bulkedit_data:/data
+      - bulkedit_nicegui:/app/.nicegui
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - bulkedit
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-him-net}"
+      - "traefik.http.routers.bulkedit.rule=Host(`${BULKEDIT_HOST:-bulkedit.vcs1.him-tools.de}`)"
+      - "traefik.http.routers.bulkedit.entrypoints=websecure"
+      - "traefik.http.routers.bulkedit.tls=true"
+      - "traefik.http.routers.bulkedit.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.bulkedit-redirect.rule=Host(`${BULKEDIT_HOST:-bulkedit.vcs1.him-tools.de}`)"
+      - "traefik.http.routers.bulkedit-redirect.entrypoints=web"
+      - "traefik.http.routers.bulkedit-redirect.middlewares=bulkedit-https-redirect"
+      - "traefik.http.middlewares.bulkedit-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.services.bulkedit.loadbalancer.server.port=8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  bulkedit_data:
+  bulkedit_nicegui:
+
+networks:
+  bulkedit:
+    external: true
+    name: ${TRAEFIK_NETWORK:-him-net}

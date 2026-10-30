@@ -21,6 +21,7 @@ from app.auth import (
     set_role,
 )
 from app.clients import ClientFactory, current_user_name
+from app.colors import TEXT_STYLE
 from app.crypto import SecretBox, UndecryptableApiKeyError
 from app.db import SessionFactory, session_scope
 from app.i18n import describe_error, t
@@ -65,8 +66,8 @@ def _authenticated(session_factory: SessionFactory, title: str) -> AppUser | Non
     page_header(title, user)
     if not is_superuser(user):
         ui.label(t("Kein Zugriff: Diese Seite verwaltet nur ein Superuser.")).classes(
-            "text-negative font-medium"
-        )
+            "font-medium"
+        ).style(TEXT_STYLE["error"])
         return None
     return user
 

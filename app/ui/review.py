@@ -12,6 +12,7 @@ from typing import Any
 from nicegui import run, ui
 
 from app.clients import ClientFactory
+from app.colors import PALETTE, TEXT_STYLE
 from app.db import SessionFactory, session_scope
 from app.i18n import describe_error, t
 from app.models import AppUser, Profile, Workspace
@@ -72,12 +73,12 @@ def register_review_pages(
             workspace = owned_workspace(session, workspace_id, user)
             if workspace is None:
                 page_header(t("Arbeitsbestände"), user)
-                ui.label(t("Der Arbeitsbestand wurde nicht gefunden.")).classes("text-negative")
+                ui.label(t("Der Arbeitsbestand wurde nicht gefunden.")).style(TEXT_STYLE["error"])
                 return
             profile = session.get(Profile, workspace.profile_id)
             if profile is None:
                 page_header(t("Arbeitsbestände"), user)
-                ui.label(t("Das Profil fehlt.")).classes("text-negative")
+                ui.label(t("Das Profil fehlt.")).style(TEXT_STYLE["error"])
                 return
             name = workspace.name or t("Arbeitsbestand {id}", id=workspace.id)
             profile_id = profile.id
@@ -131,9 +132,9 @@ def register_review_pages(
 
         def show(preview: PlanPreview) -> None:
             if preview.requires_comment and not preview.comment:
-                comment.classes(add="text-negative")
+                comment.props(f'color="{PALETTE.text_error}"')
             else:
-                comment.classes(remove="text-negative")
+                comment.props(f'color="{PALETTE.primary}"')
             message.set_text(
                 t(
                     "Feldänderungen: {changes} | Dateien: {files} | Anfragen: {steps}",
@@ -151,9 +152,13 @@ def register_review_pages(
                 for item in preview.errors:
                     if item in hidden:
                         continue
-                    ui.label(t("Fehler: {message}", message=item)).classes("text-negative text-sm")
+                    ui.label(t("Fehler: {message}", message=item)).classes("text-sm").style(
+                        TEXT_STYLE["error"]
+                    )
                 for item in preview.warnings:
-                    ui.label(t("Hinweis: {message}", message=item)).classes("text-warning text-sm")
+                    ui.label(t("Hinweis: {message}", message=item)).classes("text-sm").style(
+                        TEXT_STYLE["warning"]
+                    )
             table.clear()
             with table:
                 if not preview.changes:
@@ -161,10 +166,12 @@ def register_review_pages(
                     return
                 for change in preview.changes[:MAX_PREVIEW_ROWS]:
                     with ui.row().classes("w-full items-center gap-3 border-b py-1 text-sm"):
-                        ui.label(str(change.file_id)).classes("w-24 text-grey")
+                        ui.label(str(change.file_id)).classes("w-24").style(TEXT_STYLE["muted"])
                         ui.label(change.label).classes("w-48 font-medium")
-                        ui.label(change.old_display or "–").classes("flex-1 text-grey")
-                        ui.label("→").classes("text-grey")
+                        ui.label(change.old_display or "–").classes("flex-1").style(
+                            TEXT_STYLE["muted"]
+                        )
+                        ui.label("→").style(TEXT_STYLE["muted"])
                         ui.label(change.new_display or "–").classes("flex-1")
 
         def refresh_job() -> PlanPreview:
@@ -256,7 +263,7 @@ def register_review_pages(
         try:
             show(refresh_job())
         except Exception as exc:  # noqa: BLE001 - Seite bleibt bedienbar
-            ui.label(describe_error(exc)).classes("text-negative")
+            ui.label(describe_error(exc)).style(TEXT_STYLE["error"])
 
         with ui.row().classes("w-full items-center gap-1"):
             action_button("refresh", t("Review aktualisieren"), refresh_now)

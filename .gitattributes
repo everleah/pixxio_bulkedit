@@ -1,0 +1,4 @@
+# Shell-Skripte laufen auf dem Linux-VPS: Zeilenenden immer LF.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.ps1 text eol=crlf

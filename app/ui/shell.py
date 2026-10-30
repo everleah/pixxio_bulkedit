@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from nicegui import app, ui
 
-from app.colors import PALETTE
+from app.colors import FOCUS_CSS, PALETTE
 from app.i18n import LOCALE_LABELS, LOCALE_STORAGE_KEY, get_locale, set_locale, t
 from app.models import AppUser, Role
 from app.ui.guard import logout
@@ -12,13 +12,16 @@ from app.ui.widgets import action_button, nav_link
 
 
 def apply_palette() -> None:
+    """Quasar-Farben setzen; gefuellte Flaechen nutzen die kontraststarke Variante."""
     ui.colors(
-        primary=PALETTE.primary,
+        primary=PALETTE.action,
         secondary=PALETTE.info_dark,
-        negative=PALETTE.error,
-        warning=PALETTE.warning,
-        positive=PALETTE.success,
+        negative=PALETTE.text_error,
+        warning=PALETTE.text_warning,
+        positive=PALETTE.text_success,
+        info=PALETTE.text_info,
     )
+    ui.add_head_html(FOCUS_CSS)
 
 
 def apply_locale() -> str:

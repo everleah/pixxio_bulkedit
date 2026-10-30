@@ -11,7 +11,10 @@ import logging
 from datetime import timedelta
 
 from nicegui import app, ui
+from sqlalchemy import text
+from starlette.responses import JSONResponse
 
+from app import __version__
 from app.auth import (
     AuthenticationError,
     LoginThrottle,
@@ -121,6 +124,22 @@ def main() -> None:
     throttle = LoginThrottle(settings.login_max_attempts, settings.login_window_seconds)
     timeout = timedelta(minutes=settings.session_timeout_minutes)
 
+    @app.get("/health")
+    def health() -> JSONResponse:
+        """Healthcheck fuer Docker und Traefik: Datenbank erreichbar?"""
+        try:
+            with session_scope(session_factory) as session:
+                session.execute(text("SELECT 1"))
+        except Exception as exc:  # noqa: BLE001 - Healthcheck meldet jeden Fehler
+            logger.warning("Healthcheck fehlgeschlagen: %s", exc)
+            return JSONResponse({"status": "error", "version": __version__}, status_code=503)
+        return JSONResponse({"status": "ok", "version": __version__})
+
+    @app.on_shutdown
+    def shutdown() -> None:
+        """Neue Anfragen sind beendet; offene Schreibvorgaenge prueft `reconcile`."""
+        logger.info("Bulk-Editor wird beendet; offene Schreibauftraege nach Neustart abgleichen.")
+
     @ui.page("/")
     def index() -> None:
         apply_palette()
@@ -140,6 +159,8 @@ def main() -> None:
     ui.run(
         title=APP_TITLE,
         favicon="\N{HERB}",
+        host=settings.host,
+        port=settings.port,
         storage_secret=settings.storage_secret.get_secret_value(),
         reload=False,
         show=False,

@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     login_window_seconds: int = Field(default=300, ge=1, le=86_400)
     script_timeout_seconds: int = Field(default=60, ge=1, le=600)
     script_max_output_chars: int = Field(default=20_000, ge=1_000, le=1_000_000)
+    host: str = Field(default="0.0.0.0")
+    port: int = Field(default=8080, ge=1, le=65_535)
 
     @field_validator("db_path")
     @classmethod

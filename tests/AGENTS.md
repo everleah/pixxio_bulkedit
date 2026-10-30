@@ -42,7 +42,11 @@
   (Laufabschluss, Change-Log-Nachzug, Buchen bei Erfolg, `unknown` ohne Wirkung).
 - `test_runs.py`: Laufuebersicht mit Zaehlern je Status und Namen, Feldhistorie,
   Undo-Vorbereitung (nur `ok`-Felder, Abweichung gegen den geschriebenen Wert,
-  fehlende Dateien, kein wirksames Feld) und die Aufbewahrungsgrenze.
+  fehlende Dateien, kein wirksames Feld), Kommentarpflicht beim Undo eines Statuswechsels
+  und die Aufbewahrungsgrenze.
+- `test_deployment.py`: Dockerfile, `.dockerignore`, Compose-Datei, `.env.vps.example`,
+  LF-Zeilenenden der Shell-Skripte, Inhalt von `backup.sh`/`restore.sh`/`deploy-vps.sh`
+  sowie Host/Port-Konfiguration und `/health`-Verdrahtung.
 
 ## Local Contracts
 
