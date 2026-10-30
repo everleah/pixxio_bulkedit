@@ -29,6 +29,7 @@ from app.bench.queries import (
 )
 from app.bench.runner import existing_workspace_id, seed_database
 from app.bench.synthetic import field_keys
+from app.colors import PALETTE
 from app.db import SessionFactory, create_session_factory, create_sqlite_engine
 
 PAGE_ROUTE = "/bench"
@@ -153,16 +154,32 @@ DATASOURCE_JS = """
 })
 """
 
-HEAD_HTML = """
+HEAD_HTML = f"""
+<style>
+  body .bench-grid {{
+    --ag-foreground-color: {PALETTE.text};
+    --ag-background-color: #ffffff;
+    --ag-header-background-color: {PALETTE.page_background};
+    --ag-header-foreground-color: {PALETTE.text};
+    --ag-odd-row-background-color: #f8fafc;
+    --ag-row-hover-color: #e6f6ec;
+    --ag-selected-row-background-color: #dcfce7;
+    --ag-border-color: #cbd5e1;
+    --ag-checkbox-checked-color: {PALETTE.primary};
+    --ag-input-focus-border-color: {PALETTE.primary};
+  }}
+</style>
 <script>
-  window.__bench = {
+  window.__bench = {{
     blocks: [],
     navStart: performance.now(),
     filter: '',
     last: null,
-  };
+  }};
 </script>
 """
+
+MIN_COLUMN_WIDTH = 80
 
 
 def create_page(keys: Sequence[str], assets: int) -> None:
@@ -174,10 +191,23 @@ def create_page(keys: Sequence[str], assets: int) -> None:
 
     @ui.page(PAGE_ROUTE)
     def page() -> None:  # pyright: ignore[reportUnusedFunction]
-        ui.add_head_html(HEAD_HTML)
-        ui.label(f"Grid-Prototyp: {assets:,} Assets, {len(keys)} Metadaten-Spalten").classes(
-            "text-lg font-semibold"
+        ui.colors(
+            primary=PALETTE.primary,
+            secondary=PALETTE.info_dark,
+            negative=PALETTE.error,
+            warning=PALETTE.warning,
+            positive=PALETTE.success,
         )
+        ui.add_head_html(HEAD_HTML)
+        with (
+            ui.row()
+            .classes("w-full items-center gap-2 rounded p-3")
+            .style(f"background: {PALETTE.header_gradient}; color: #ffffff")
+        ):
+            ui.label(f"Grid-Prototyp: {assets:,} Assets, {len(keys)} Metadaten-Spalten").classes(
+                "text-lg font-semibold"
+            )
+
         with ui.row().classes("items-end gap-2"):
             filter_input = ui.input("Filter (enthaelt)").props("outlined dense").classes("w-64")
             sort_select = (
@@ -186,19 +216,21 @@ def create_page(keys: Sequence[str], assets: int) -> None:
                 .classes("w-48")
             )
             direction = ui.toggle({"asc": "aufsteigend", "desc": "absteigend"}, value="asc")
-            status = ui.label("").classes("text-sm")
+            status = ui.label("").style(f"color: {PALETTE.text}").classes("text-sm")
 
         grid = ui.aggrid(
             {
                 "columnDefs": column_defs,
+                "defaultColDef": {"resizable": True, "sortable": True},
                 "rowModelType": "infinite",
                 "cacheBlockSize": BLOCK_SIZE,
                 "maxBlocksInCache": 2,
                 "rowBuffer": 5,
                 "animateRows": False,
                 ":datasource": DATASOURCE_JS,
-            }
-        ).classes("w-full h-[32rem]")
+            },
+            auto_size_columns=False,
+        ).classes("bench-grid w-full h-[32rem]")
 
         async def apply_filter() -> None:
             await ui.run_javascript(
@@ -215,8 +247,30 @@ def create_page(keys: Sequence[str], assets: int) -> None:
             )
             status.set_text(f"Sortierung: {field or 'keine'} {direction.value}")
 
-        ui.button("Filter anwenden", on_click=apply_filter).props("dense")
-        ui.button("Sortierung anwenden", on_click=apply_sort).props("dense")
+        async def fit_content() -> None:
+            await grid.run_grid_method("autoSizeAllColumns", False)
+            status.set_text("Spalten an Inhalt angepasst")
+
+        async def fit_display() -> None:
+            await grid.run_grid_method("sizeColumnsToFit")
+            narrowest = await ui.run_javascript(
+                "Math.round(Math.min(...Array.from("
+                "document.querySelectorAll('.ag-header-cell'))"
+                ".map((cell) => cell.getBoundingClientRect().width)))"
+            )
+            if isinstance(narrowest, int | float) and narrowest < MIN_COLUMN_WIDTH:
+                status.set_text(
+                    f"An Anzeige angepasst, aber {len(keys) + 2} Spalten sind nur "
+                    f"{narrowest:.0f} px breit - Inhalt nicht lesbar"
+                )
+            else:
+                status.set_text("Spalten an Anzeige angepasst")
+
+        with ui.row().classes("gap-2"):
+            ui.button("Filter anwenden", on_click=apply_filter).props("dense")
+            ui.button("Sortierung anwenden", on_click=apply_sort).props("dense")
+            ui.button("An Inhalt anpassen", on_click=fit_content).props("dense outline")
+            ui.button("An Anzeige anpassen", on_click=fit_display).props("dense outline")
 
 
 def build_parser() -> argparse.ArgumentParser:

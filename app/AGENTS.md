@@ -41,6 +41,8 @@
 - `app/bench/` arbeitet offline auf synthetischen Daten und nie auf der Anwendungsdatenbank.
 - Die Prototyp-Route `/bench` und `/bench/rows` gehoert nur zum Lastnachweis; Fachseiten
   entstehen getrennt davon.
+- UI-Farben ausschliesslich aus `app/colors.py` beziehen, auch fuer AG Grid
+  (`--ag-*`-Variablen auf dem Grid-Container).
 - API-Keys liegen ausschliesslich verschluesselt in `profile.api_key_enc` und nie in
   Logs, Fehlermeldungen, Sessions oder im Browser.
 - Berechtigungen werden serverseitig je Aktion geprueft; UI-Ausblendungen ersetzen das nicht.

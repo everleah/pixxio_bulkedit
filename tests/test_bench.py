@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -57,6 +58,13 @@ def test_werte_passen_zum_feldtyp() -> None:
     assert isinstance(values["custom:2"], int)
     assert isinstance(values["custom:4"], bool)
     assert isinstance(values["custom:6"], list)
+
+
+def test_datumswerte_sind_gueltig() -> None:
+    keys = field_keys(len(FIELD_TYPES))
+    for file_id, values in generate_assets(50, keys, seed=11):
+        parsed = datetime.strptime(values["custom:3"], "%Y-%m-%d %H:%M:%S")
+        assert 2026 <= parsed.year <= 2027, file_id
 
 
 def test_perzentil() -> None:

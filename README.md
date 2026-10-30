@@ -152,9 +152,12 @@ Wachstum. `--db-path` behaelt die Datei, `--keep` die temporaere. Die Messwerte 
 
 Startet einen Prototyp unter `http://127.0.0.1:8200/bench`: AG Grid Community mit
 Infinite Row Model, Blockabruf ueber `/bench/rows`, serverseitiger Filter und
-serverseitige Sortierung auf dem effektiven Stand. Der erste Start legt die
-Datenbank unter `%TEMP%` an; weitere Starts verwenden sie wieder. Die Route ist nur
-Teil des Lastnachweises, nicht der Anwendung.
+serverseitige Sortierung auf dem effektiven Stand. Die Schaltflaechen
+**An Inhalt anpassen** und **An Anzeige anpassen** setzen die Spaltenbreiten auf den
+Zellinhalt beziehungsweise auf die sichtbare Breite; wird eine Spalte dabei schmaler als
+80 px, meldet die Oberflaeche das sichtbar. Farben und Kopfzeilenverlauf stammen aus
+`app/colors.py`. Der erste Start legt die Datenbank unter `%TEMP%` an; weitere Starts
+verwenden sie wieder. Die Route ist nur Teil des Lastnachweises, nicht der Anwendung.
 
 ## Code-Quality-Gates
 

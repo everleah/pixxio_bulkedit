@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Iterator, Sequence
+from datetime import datetime, timedelta
 from typing import Any
 
 FIELD_TYPES: tuple[str, ...] = (
@@ -22,7 +23,8 @@ SELECTION_OPTIONS: tuple[str, ...] = (
     "Sensoren",
     "Werkzeug",
 )
-DATE_START = "2026-01-01 00:00:00"
+DATE_START = datetime(2026, 1, 1, 12, 0, 0)
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def field_keys(count: int) -> list[str]:
@@ -51,8 +53,8 @@ def generate_values(
         elif kind == "number":
             values[key] = rng.randrange(0, 10_000)
         elif kind == "date":
-            day = rng.randrange(0, 365)
-            values[key] = f"2026-{1 + day // 28:02d}-{1 + day % 28:02d} 12:00:00"
+            moment = DATE_START + timedelta(days=rng.randrange(0, 365))
+            values[key] = moment.strftime(DATE_FORMAT)
         elif kind == "boolean":
             values[key] = bool(rng.getrandbits(1))
         elif kind == "selection":
