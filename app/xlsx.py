@@ -34,6 +34,7 @@ from app.normalize import canonical, display_value, is_empty, values_equal
 from app.schema import ColumnDef, ProfileSchema
 from app.scripts.errors import ScriptContractError
 from app.workspaces import (
+    VIEW_PARAM,
     AssetRow,
     WorkspaceError,
     changed_count,
@@ -853,7 +854,11 @@ def import_workbook(
     }
     name = f"{t('Excel-Import')}: {filename}"[:200]
     workspace = create_workspace(
-        session, owner=owner, profile=profile, name=name, params={"xlsx": meta}
+        session,
+        owner=owner,
+        profile=profile,
+        name=name,
+        params={"xlsx": meta, VIEW_PARAM: list(parsed.keys)},
     )
     store_snapshot(
         session,

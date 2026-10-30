@@ -366,6 +366,16 @@ Zeilen, Verwerfen und Schliessen. Live geprueft: 4 Assets aus Collection `chub`,
 (Revision 1), Filter (1 Treffer), Bulk-Wert (Revision 2), Verwerfen (Revision 3) und
 Mehr-Tab-Warnung.
 
+Umgesetzt (30.10.2026, Spaltenauswahl): Statt fester `COLUMNS` je Script kann die Auswahl
+im Grid geaendert werden ("Spalten auswaehlen"): alle Felder des Profils in drei Gruppen,
+Feldfilter, Zaehler, "Alle"/"Keine"/"Zuruecksetzen"/"Uebernehmen", Obergrenze 80 Spalten.
+Die Auswahl liegt je Arbeitsbestand in `params_json["@columns"]`, wirkt auf Filter,
+Sortierung und Excel-Export und ist reine Anzeige-Einstellung (keine neue Revision, Review
+prueft ohne Spalteneinschraenkung). Live geprueft: Profil mit 404 Feldern (davon rund 390
+Standard-Metadatenfelder), Filter "Datum" auf drei Felder, "Alle" bis zur Obergrenze mit
+Hinweis auf 324 nicht gewaehlte Felder, Uebernehmen mit 80 Spalten, Zuruecksetzen auf die
+Standardspalten.
+
 ### Massenaktionen
 
 Jede Aktion verlangt eine ausdrueckliche Zielauswahl:

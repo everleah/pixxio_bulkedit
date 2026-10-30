@@ -157,6 +157,17 @@ Namen vor dem Senden auf.
 - Spalten kommen aus `COLUMNS` des Scripts (`std:subject`, `custom:Kampagne`,
   `standard:DateSent`); ohne `COLUMNS` erscheinen Dateiname, Titel, Beschreibung und bis
   zu zwölf Custom-Felder.
+- „Spalten auswählen" (Icon `view_column`) öffnet die Spaltenauswahl: alle Felder des
+  Profils in drei Gruppen (Standardattribute, eigene Metadatenfelder,
+  Standard-Metadatenfelder), mit Feldfilter, Zähler und den Schaltflächen „Alle",
+  „Keine", „Zurücksetzen" und „Übernehmen". Die Auswahl gilt nur für diesen
+  Arbeitsbestand, wird in `params_json` gespeichert (höchstens 80 Spalten) und wirkt
+  auch auf Filter, Sortierung und Excel-Export. „Zurücksetzen" stellt die
+  Script- beziehungsweise Standardspalten wieder her.
+
+  > Hinweis: Ein Profil kann sehr viele Standard-Metadatenfelder mitbringen (im
+  > Testsystem rund 390). Ohne Feldfilter ist die Liste lang; „Alle" wählt dann nur bis
+  > zur Obergrenze und meldet, wie viele Felder übrig blieben.
 - Editoren je Typ: Text, Zahl, Datum (`JJJJ-MM-TT HH:MM:SS`), Wahrheitswert,
   Auswahlliste; `map`/`focalpoint`/`orientation` und `std:fileName` sind nur lesbar.
 - Texte werden exakt gespeichert (kein Trimmen). Geänderte Zellen sind grün markiert,

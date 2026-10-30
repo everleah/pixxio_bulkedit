@@ -35,6 +35,7 @@ from app.scripts.contract import ScriptResult
 from app.scripts.errors import ScriptContractError
 from app.scripts.runner import ScriptOutcome
 from app.workspaces import (
+    MAX_SELECTED_COLUMNS,
     AssetRow,
     WorkspaceConflictError,
     WorkspaceError,
@@ -42,6 +43,7 @@ from app.workspaces import (
     changed_changes,
     changed_count,
     clear_changes,
+    clear_columns,
     close_workspace,
     create_workspace,
     effective_page,
@@ -52,7 +54,9 @@ from app.workspaces import (
     revert_change,
     set_change,
     snapshot_value,
+    store_columns,
     store_snapshot,
+    stored_columns,
 )
 
 FIELD_TEXT = ColumnDef(
@@ -314,6 +318,81 @@ def test_snapshot_wert_lesen(session: Session, workspace: Workspace) -> None:
     assert snapshot_value(session, workspace.id, 1, "std:subject") == "Zebra"
     with pytest.raises(WorkspaceError):
         snapshot_value(session, workspace.id, 99, "std:subject")
+
+
+# --- Spaltenauswahl --------------------------------------------------------
+
+
+def test_spaltenauswahl_wird_gespeichert(session: Session, workspace: Workspace) -> None:
+    assert stored_columns(workspace) is None
+    stored = store_columns(
+        session, workspace, ["std:subject", "custom:4711", "std:subject", " ", "7"]
+    )
+    assert stored == ["std:subject", "custom:4711", "7"]
+    assert stored_columns(workspace) == ["std:subject", "custom:4711", "7"]
+    clear_columns(session, workspace)
+    assert stored_columns(workspace) is None
+
+
+def test_spaltenauswahl_erhaelt_script_parameter(
+    session: Session, owner: AppUser, profile: Profile
+) -> None:
+    import json
+
+    created = create_workspace(
+        session,
+        owner=owner,
+        profile=profile,
+        name="Mit Parametern",
+        params={"collection": "chub", "include_archived": False},
+    )
+    store_columns(session, created, ["std:subject"])
+    params = json.loads(created.params_json or "{}")
+    assert params["collection"] == "chub"
+    assert params["include_archived"] is False
+    assert params["@columns"] == ["std:subject"]
+    clear_columns(session, created)
+    assert json.loads(created.params_json or "{}") == {
+        "collection": "chub",
+        "include_archived": False,
+    }
+
+
+def test_spaltenauswahl_verlangt_mindestens_eine_spalte(
+    session: Session, workspace: Workspace
+) -> None:
+    with pytest.raises(WorkspaceError, match="mindestens eine Spalte"):
+        store_columns(session, workspace, [" ", ""])
+    assert stored_columns(workspace) is None
+
+
+def test_spaltenauswahl_hat_eine_obergrenze(session: Session, workspace: Workspace) -> None:
+    keys = [f"custom:{index}" for index in range(MAX_SELECTED_COLUMNS + 1)]
+    with pytest.raises(WorkspaceError, match="hoechstens"):
+        store_columns(session, workspace, keys)
+    assert stored_columns(workspace) is None
+
+
+def test_ansicht_folgt_der_spaltenauswahl(
+    session: Session, workspace: Workspace, profile: Profile
+) -> None:
+    from app.ui.workspaces import view_columns, workspace_columns
+
+    schema = build_schema(_fields())
+    default = workspace_columns(schema, None)
+    assert [column.key for column in default][:3] == [
+        "std:fileName",
+        "std:subject",
+        "std:description",
+    ]
+    assert any(column.source == "standard" for column in schema.columns())
+    store_columns(session, workspace, ["std:subject", "standard:978216530", "custom:9999"])
+    selected = view_columns(session, workspace, schema)
+    assert [column.key for column in selected] == ["std:subject", "standard:978216530"]
+    clear_columns(session, workspace)
+    assert [column.key for column in view_columns(session, workspace, schema)] == [
+        column.key for column in default
+    ]
 
 
 def test_aenderung_setzen_und_zuruecknehmen(

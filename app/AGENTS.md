@@ -149,6 +149,13 @@
   mitsenden, sonst antwortet der Service mit `WorkspaceConflictError` (mehrere Tabs).
 - Entwuerfe laufen nach `DRAFT_TTL_DAYS` (30) ab; unter `EXPIRY_WARNING_DAYS` (7) Resttagen
   warnt die UI. Laufende Schreibauftraege verlaengern die Laufzeit.
+- Die Spaltenauswahl je Arbeitsbestand liegt in `params_json` unter dem reservierten
+  Schluessel `VIEW_PARAM` (`"@columns"`, kein gueltiger Script-Parametername) und ist auf
+  `MAX_SELECTED_COLUMNS` (80) begrenzt. Sie ist eine Anzeige-Einstellung: `stored_columns`,
+  `store_columns` und `clear_columns` erhoehen bewusst nicht `edit_revision`, und die
+  Review-Seite prueft ohne Spalteneinschraenkung (`script_columns=None`), damit eine
+  verborgene Spalte keine erfasste Aenderung blockiert. Der Excel-Import speichert die
+  Spalten der Datei als Auswahl.
 - Standardattribute der Datei (`std:*`) und Metadaten (`custom:*`, `standard:*`) werden
   getrennt gelesen: erstere direkt am File, letztere aus `metadataFields[str(feld_id)]`.
   Der Dateistatus kommt aus `fileState.id` und wird ueber die Optionen zu seinem Namen

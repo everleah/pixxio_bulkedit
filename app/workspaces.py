@@ -38,6 +38,9 @@ EXPIRY_WARNING_DAYS = 7
 INSERT_CHUNK = 500
 ID_FILTER_CHUNK = 200
 LOAD_PAGE_SIZE = 200
+# Spaltenauswahl je Arbeitsbestand; reservierter Schluessel, der kein Script-Parameter sein kann.
+VIEW_PARAM = "@columns"
+MAX_SELECTED_COLUMNS = 80
 
 
 class WorkspaceError(Exception):
@@ -193,14 +196,60 @@ def touch(session: Session, workspace: Workspace) -> None:
 
 def import_meta(workspace: Workspace) -> dict[str, Any] | None:
     """Metadaten eines Excel-Imports, sonst ``None``."""
+    meta = _params_dict(workspace).get("xlsx")
+    return meta if isinstance(meta, dict) else None
+
+
+def _params_dict(workspace: Workspace) -> dict[str, Any]:
     if not workspace.params_json:
-        return None
+        return {}
     try:
         params = json.loads(workspace.params_json)
     except ValueError:
+        return {}
+    return params if isinstance(params, dict) else {}
+
+
+def _write_params(workspace: Workspace, params: dict[str, Any]) -> None:
+    workspace.params_json = json.dumps(params, ensure_ascii=False) if params else None
+
+
+def stored_columns(workspace: Workspace) -> list[str] | None:
+    """Gespeicherte Spaltenauswahl des Arbeitsbestands."""
+    value = _params_dict(workspace).get(VIEW_PARAM)
+    if not isinstance(value, list):
         return None
-    meta = params.get("xlsx") if isinstance(params, dict) else None
-    return meta if isinstance(meta, dict) else None
+    keys = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    return keys or None
+
+
+def store_columns(session: Session, workspace: Workspace, keys: Sequence[str]) -> list[str]:
+    """Speichert die Spaltenauswahl; liefert die uebernommenen Schluessel."""
+    cleaned: list[str] = []
+    for key in keys:
+        text = str(key).strip()
+        if text and text not in cleaned:
+            cleaned.append(text)
+    if not cleaned:
+        raise WorkspaceError("Es muss mindestens eine Spalte ausgewaehlt bleiben.")
+    if len(cleaned) > MAX_SELECTED_COLUMNS:
+        raise WorkspaceError(
+            f"Es sind hoechstens {MAX_SELECTED_COLUMNS} Spalten gleichzeitig auswaehlbar."
+        )
+    params = _params_dict(workspace)
+    params[VIEW_PARAM] = cleaned
+    _write_params(workspace, params)
+    touch(session, workspace)
+    return cleaned
+
+
+def clear_columns(session: Session, workspace: Workspace) -> None:
+    """Verwirft die Spaltenauswahl; es gelten wieder Script- beziehungsweise Standardspalten."""
+    params = _params_dict(workspace)
+    if params.pop(VIEW_PARAM, None) is None:
+        return
+    _write_params(workspace, params)
+    touch(session, workspace)
 
 
 def list_workspaces(session: Session, owner_id: int) -> Sequence[Workspace]:
@@ -679,6 +728,8 @@ def bulk_set(
 __all__ = [
     "DRAFT_TTL_DAYS",
     "EXPIRY_WARNING_DAYS",
+    "MAX_SELECTED_COLUMNS",
+    "VIEW_PARAM",
     "AssetRow",
     "ChangeEntry",
     "WorkspaceConflictError",
@@ -689,6 +740,7 @@ __all__ = [
     "changed_count",
     "changed_file_ids",
     "clear_changes",
+    "clear_columns",
     "close_workspace",
     "commit_applied",
     "create_workspace",
@@ -697,6 +749,7 @@ __all__ = [
     "expiry_for",
     "expiry_warning_days",
     "file_values",
+    "import_meta",
     "json_path",
     "list_workspaces",
     "load_assets",
@@ -705,6 +758,8 @@ __all__ = [
     "revert_change",
     "set_change",
     "snapshot_value",
+    "store_columns",
     "store_snapshot",
+    "stored_columns",
     "touch",
 ]

@@ -579,6 +579,18 @@ def test_import_schreibt_metadaten_in_den_bestand(
     assert created.params_json is not None
 
 
+def test_import_speichert_spaltenauswahl(
+    session: Session, workspace: Workspace, profile: Profile, owner: AppUser, client: None
+) -> None:
+    from app.workspaces import stored_columns
+
+    data = _edit(_export(session, workspace, profile, owner).data, xlsx.DATA_SHEET, "D3", "Neu 1")
+    result = _import(session, profile, owner, data)
+    created = session.get(Workspace, result.workspace_id)
+    assert created is not None
+    assert stored_columns(created) == ["std:subject", "std:keywords", "custom:4711"]
+
+
 def test_import_lauf_hat_quelle_xlsx(
     session: Session, workspace: Workspace, profile: Profile, owner: AppUser, client: None
 ) -> None:

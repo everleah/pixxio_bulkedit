@@ -21,7 +21,7 @@ from app.schema import SchemaCache
 from app.ui.guard import current_user, redirect_to_login
 from app.ui.shell import apply_locale, apply_palette, page_header
 from app.ui.widgets import action_button
-from app.ui.workspaces import owned_workspace, script_column_keys, workspace_columns
+from app.ui.workspaces import owned_workspace, view_columns
 from app.writeplan import PlanPreview, latest_plan, plan_is_current, save_plan
 from app.writer import WriteReport, dry_run, execute, execution_blockers, review
 
@@ -82,9 +82,8 @@ def register_review_pages(
                 return
             name = workspace.name or t("Arbeitsbestand {id}", id=workspace.id)
             profile_id = profile.id
-            script_keys = script_column_keys(session, workspace)
             schema = schema_cache.get(profile)
-            columns = workspace_columns(schema, script_keys)
+            columns = view_columns(session, workspace, schema)
 
         page_header(name, user)
         ui.label(
@@ -116,7 +115,9 @@ def register_review_pages(
                 schema,
                 columns,
                 client,
-                script_columns=script_keys,
+                # Die Spaltenauswahl ist eine Anzeige-Einstellung: sie darf keine
+                # bereits erfassten Aenderungen aus der Pruefung ausschliessen.
+                script_columns=None,
                 comment=str(comment.value or ""),
             )
 

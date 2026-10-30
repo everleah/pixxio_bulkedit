@@ -21,6 +21,21 @@ LOCALE_STORAGE_KEY = "locale"
 
 # Englische Übersetzungen; Schlüssel ist der deutsche Quelltext.
 EN_TRANSLATIONS: dict[str, str] = {
+    # Spaltenauswahl: Filter und Zähler
+    "Felder filtern": "Filter fields",
+    "Höchstens {limit} Spalten; {skipped} Felder wurden nicht ausgewählt.": "At most {limit} columns; {skipped} fields were not selected.",
+    "{count} von {limit} Spalten ausgewählt": "{count} of {limit} columns selected",
+    # Spaltenauswahl
+    "Alle": "All",
+    "Die Auswahl gilt nur für diesen Arbeitsbestand und wird gespeichert. Höchstens {limit} Spalten.": "The selection applies to this workspace only and is saved. At most {limit} columns.",
+    "Eigene Metadatenfelder": "Custom metadata fields",
+    "Keine": "None",
+    "Spalten auswählen": "Select columns",
+    "Standard-Metadatenfelder": "Standard metadata fields",
+    "Standardattribute": "Standard attributes",
+    "Zurücksetzen": "Reset",
+    "{count} Spalten übernommen.": "{count} columns applied.",
+    "Übernehmen": "Apply",
     # Excel-Fehlerdatei
     "Fehlerdatei erstellt: {count} markierte Zellen.": "Error file created: {count} marked cells.",
     "Fehlerdatei herunterladen": "Download error file",

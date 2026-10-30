@@ -39,12 +39,14 @@ from app.ui.shell import apply_locale, apply_palette, page_header
 from app.ui.widgets import action_button
 from app.workspaces import (
     EXPIRY_WARNING_DAYS,
+    MAX_SELECTED_COLUMNS,
     WorkspaceConflictError,
     WorkspaceError,
     bulk_set,
     changed_changes,
     changed_count,
     clear_changes,
+    clear_columns,
     close_workspace,
     create_workspace,
     delete_workspace,
@@ -54,7 +56,9 @@ from app.workspaces import (
     load_assets,
     resolve_targets,
     set_change,
+    store_columns,
     store_snapshot,
+    stored_columns,
 )
 from app.xlsx import (
     MAX_FILE_BYTES,
@@ -223,9 +227,18 @@ def _column_for(columns: Sequence[ColumnDef], key: object) -> ColumnDef | None:
 
 
 def workspace_columns(
-    schema: ProfileSchema, script_columns: Sequence[str] | None
+    schema: ProfileSchema,
+    script_columns: Sequence[str] | None,
+    selected: Sequence[str] | None = None,
 ) -> list[ColumnDef]:
-    """Spalten des Arbeitsbestands: aus ``COLUMNS``, sonst Standard- plus Custom-Felder."""
+    """Spalten des Arbeitsbestands.
+
+    Reihenfolge der Quellen: gespeicherte Auswahl, ``COLUMNS`` des Scripts, Standardspalten.
+    """
+    if selected:
+        resolved_selected, _unknown = resolve_columns(schema, list(selected))
+        if resolved_selected:
+            return resolved_selected
     if script_columns:
         resolved, _unknown = resolve_columns(schema, list(script_columns))
         if resolved:
@@ -235,6 +248,15 @@ def workspace_columns(
     custom = [column for column in schema.custom[:DEFAULT_CUSTOM_COLUMNS]]
     resolved_custom, _ = resolve_columns(schema, [f"custom:{field.id}" for field in custom])
     return resolved_default + [column for column in resolved_custom if column.key not in seen]
+
+
+def view_columns(session: Any, workspace: Workspace, schema: ProfileSchema) -> list[ColumnDef]:
+    """Spalten eines Arbeitsbestands inklusive gespeicherter Auswahl."""
+    return workspace_columns(
+        schema,
+        script_column_keys(session, workspace),
+        stored_columns(workspace),
+    )
 
 
 def column_def(column: ColumnDef) -> dict[str, Any]:
@@ -330,7 +352,7 @@ def register_workspace_pages(
             if profile is None:
                 return JSONResponse({"error": "Profil fehlt"}, status_code=409)
             schema = schema_cache.get(profile)
-            columns = workspace_columns(schema, script_column_keys(session, workspace))
+            columns = view_columns(session, workspace, schema)
             if not columns:
                 return JSONResponse({"error": "keine Spalten"}, status_code=409)
             sort_column = _column_for(columns, params.get("sortKey")) or columns[0]
@@ -822,7 +844,7 @@ def register_workspace_pages(
             changed = changed_count(session, workspace.id)
             warning = expiry_warning_days(workspace)
             schema = schema_cache.get(profile)
-            columns = workspace_columns(schema, script_column_keys(session, workspace))
+            columns = view_columns(session, workspace, schema)
 
         page_header(name, user)
         ui.add_head_html(GRID_HEAD)
@@ -862,6 +884,159 @@ def register_workspace_pages(
         column_options = {column.key: column.label for column in columns}
         writable = [column for column in columns if column.writable]
         state: dict[str, Any] = {"filter": "", "filterKey": "", "onlyChanged": False}
+
+        all_columns = schema.columns()
+        selected_keys = {column.key for column in columns}
+        checked: dict[str, Any] = {}
+        visible_keys: set[str] = set()
+        built = {"done": False, "bulk": False}
+        column_groups = (
+            ("file_attr", t("Standardattribute")),
+            ("custom", t("Eigene Metadatenfelder")),
+            ("standard", t("Standard-Metadatenfelder")),
+        )
+
+        with ui.dialog() as column_dialog, ui.card().classes("w-[560px] gap-2"):
+            ui.label(t("Spalten auswählen")).classes("font-semibold text-base")
+            ui.label(
+                t(
+                    "Die Auswahl gilt nur für diesen Arbeitsbestand und wird gespeichert. "
+                    "Höchstens {limit} Spalten.",
+                    limit=MAX_SELECTED_COLUMNS,
+                )
+            ).classes("text-xs")
+            column_filter = (
+                ui.input(t("Felder filtern")).props("outlined dense clearable").classes("w-full")
+            )
+            column_list = ui.column().classes("w-full gap-1 max-h-96 overflow-auto")
+            counter = ui.label("").classes("text-xs")
+            with ui.row().classes("w-full items-center justify-between"):
+                with ui.row().classes("gap-2"):
+                    all_button = ui.button(t("Alle")).props("flat dense")
+                    none_button = ui.button(t("Keine")).props("flat dense")
+                    ui.button(t("Zurücksetzen"), on_click=lambda: _reset_columns()).props(
+                        "flat dense"
+                    )
+                with ui.row().classes("gap-2"):
+                    ui.button(t("Abbrechen"), on_click=column_dialog.close).props("flat dense")
+                    apply_button = ui.button(t("Übernehmen")).props("unelevated dense")
+
+        def _build_column_list() -> None:
+            if built["done"]:
+                return
+            built["done"] = True
+            with column_list:
+                for source, title in column_groups:
+                    group = [column for column in all_columns if column.source == source]
+                    if not group:
+                        continue
+                    ui.label(title).classes("text-xs font-semibold mt-1")
+                    for column in group:
+                        label = column.label
+                        if not column.writable:
+                            label = f"{label} ({t('nur lesen')})"
+                        widget = ui.checkbox(label, value=column.key in selected_keys)
+                        widget.classes("text-sm")
+                        widget.on_value_change(lambda _: _refresh_counter())
+                        checked[column.key] = widget
+
+        def _chosen_keys() -> list[str]:
+            return [
+                column.key
+                for column in all_columns
+                if column.key in checked and checked[column.key].value
+            ]
+
+        def _refresh_counter() -> None:
+            if built["bulk"] or not built["done"]:
+                return
+            chosen = len(_chosen_keys())
+            counter.set_text(
+                t(
+                    "{count} von {limit} Spalten ausgewählt",
+                    count=chosen,
+                    limit=MAX_SELECTED_COLUMNS,
+                )
+            )
+            apply_button.set_enabled(0 < chosen <= MAX_SELECTED_COLUMNS)
+
+        def _apply_filter() -> None:
+            if not built["done"]:
+                return
+            term = str(column_filter.value or "").strip().lower()
+            visible_keys.clear()
+            for column in all_columns:
+                hit = not term or term in column.label.lower() or term in column.key.lower()
+                checked[column.key].set_visibility(hit)
+                if hit:
+                    visible_keys.add(column.key)
+
+        def _set_all(value: bool) -> None:
+            built["bulk"] = True
+            try:
+                if not value:
+                    for widget in checked.values():
+                        widget.value = False
+                    return
+                chosen = len(_chosen_keys())
+                skipped = 0
+                for column in all_columns:
+                    widget = checked.get(column.key)
+                    if widget is None or column.key not in visible_keys or widget.value:
+                        continue
+                    if chosen >= MAX_SELECTED_COLUMNS:
+                        skipped += 1
+                        continue
+                    widget.value = True
+                    chosen += 1
+                if skipped:
+                    ui.notify(
+                        t(
+                            "Höchstens {limit} Spalten; {skipped} Felder wurden nicht ausgewählt.",
+                            limit=MAX_SELECTED_COLUMNS,
+                            skipped=skipped,
+                        ),
+                        color="warning",
+                    )
+            finally:
+                built["bulk"] = False
+            _refresh_counter()
+
+        def _apply_columns() -> None:
+            keys = _chosen_keys()
+            with session_scope(session_factory) as session:
+                current = session.get(Workspace, workspace_id)
+                if current is None:
+                    return
+                try:
+                    stored = store_columns(session, current, keys)
+                except WorkspaceError as exc:
+                    ui.notify(describe_error(exc), color="negative")
+                    return
+            column_dialog.close()
+            ui.notify(t("{count} Spalten übernommen.", count=len(stored)))
+            ui.navigate.reload()
+
+        def _reset_columns() -> None:
+            with session_scope(session_factory) as session:
+                current = session.get(Workspace, workspace_id)
+                if current is None:
+                    return
+                clear_columns(session, current)
+            column_dialog.close()
+            ui.navigate.reload()
+
+        def _open_columns() -> None:
+            _build_column_list()
+            column_filter.value = ""
+            _apply_filter()
+            _refresh_counter()
+            column_dialog.open()
+
+        all_button.on_click(lambda: _set_all(True))
+        none_button.on_click(lambda: _set_all(False))
+        apply_button.on_click(_apply_columns)
+        column_filter.on_value_change(lambda _: _apply_filter())
 
         with ui.row().classes("w-full flex-wrap items-end gap-2"):
             filter_column_select = (
@@ -1147,6 +1322,7 @@ def register_workspace_pages(
             action_button("open_in_full", t("Spalten an Anzeige anpassen"), fit_display)
             action_button("edit_note", t("Wert auf Ziel setzen"), apply_value)
             action_button("undo", t("Änderungen verwerfen"), revert_selection)
+            action_button("view_column", t("Spalten auswählen"), _open_columns)
             action_button(
                 "table_view", t("Excel-Export (markierte oder gefilterte Zeilen)"), export_excel
             )

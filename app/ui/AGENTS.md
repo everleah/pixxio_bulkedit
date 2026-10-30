@@ -26,8 +26,9 @@
   veroeffentlichten Script, Excel-Import, Liste offener Entwuerfe) und `/workspaces/{id}`
   (AG Grid mit Infinite Row Model). Daten liefern `GET /workspace/rows` (effektiver Stand,
   Filter, Sortierung, `onlyChanged`) und `GET /workspace/changes` (geaenderte Zellen je
-  Asset). Die Werkzeugleiste enthaelt den Excel-Export der markierten oder gefilterten
-  Zeilen.
+  Asset). Die Werkzeugleiste enthaelt die Spaltenauswahl und den Excel-Export der
+  markierten oder gefilterten Zeilen; `view_columns(session, workspace, schema)` liefert
+  die sichtbaren Spalten inklusive gespeicherter Auswahl.
 - `review.py`: `register_review_pages` registriert `/workspaces/{id}/review`: Liste aller
   Feldänderungen, Fehler/Hinweise (inklusive externer Aenderungen), `Dry Run prüfen`,
   `Jetzt schreiben` und Rueckweg ins Grid.
@@ -68,6 +69,8 @@
 - Die Review-Seite arbeitet ausschliesslich ueber `app/writer.py` und `app/writeplan.py`;
   sie baut das Preview bei jedem Schritt neu (Digest-Pruefung) und zeigt Fehler, Hinweise
   und Konflikte an. Geschrieben wird nur ueber `client_factory.writer_client_for`.
+  Sie prueft ohne Spalteneinschraenkung (`script_columns=None`), damit eine ausgeblendete
+  Spalte keine erfasste Aenderung blockiert.
 - Blockierende Arbeit (Preview, Dry Run, Schreiben) laeuft in `run.io_bound` und oeffnet
   dort eine eigene Session; danach aktualisiert die Seite die Anzeige mit dem neuen Preview.
 - Ein Feld "Kommentar zum Statuswechsel" gehoert zum Preview-Aufbau: `build_preview` bricht
@@ -95,6 +98,12 @@
 - Bei Befunden erscheint "Fehlerdatei herunterladen": `build_error_workbook` laeuft in
   `run.io_bound` und startet `ui.download`; der Knopf verschwindet beim naechsten Upload
   wieder (`_reset_import`).
+- Die Spaltenauswahl wird erst beim ersten Oeffnen gebaut (`_build_column_list`): Ein
+  Profil kann mehrere hundert Standard-Metadatenfelder haben, die Dialogelemente sollen
+  den Grid-Aufbau nicht belasten. Der Feldfilter blendet Checkboxen ueber
+  `set_visibility` aus, "Alle" waehlt nur sichtbare Felder bis `MAX_SELECTED_COLUMNS`,
+  "Uebernehmen" ruft `store_columns` und laedt die Seite neu (`ui.navigate.reload`),
+  "Zuruecksetzen" ruft `clear_columns`.
 
 ## Work Guidance
 
@@ -119,6 +128,9 @@
 - `/workspaces/{id}/review`: Dry Run ausfuehren (Protokolleintrag mit Status `ok`), dann
   "Jetzt schreiben"; nach Erfolg steht die Aenderungszahl auf 0 und die Werte sind im Grid
   sichtbar. Mit einer extern geaenderten Datei muss der Lauf ohne Bestaetigung blockieren.
+- Spaltenauswahl: "Spalten auswaehlen" oeffnen, Feldfilter nutzen, "Alle"/"Keine",
+  "Uebernehmen" und "Zuruecksetzen" pruefen; das Grid zeigt danach genau die gewaehlten
+  Spalten, und die Auswahl ueberlebt ein Neuladen der Seite.
 - Excel: im Grid exportieren, in der Arbeitsmappe eine Zelle aendern, ueber `/workspaces`
   importieren; der neue Arbeitsbestand zeigt genau diese Aenderung, und die Review-Seite
   schreibt sie mit `run.source = xlsx`.
