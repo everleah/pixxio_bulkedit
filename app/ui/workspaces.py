@@ -1,7 +1,7 @@
-"""NiceGUI-Seiten fuer Arbeitsbestaende und das Grid.
+"""NiceGUI-Seiten für Arbeitsbestände und das Grid.
 
-`/workspaces` listet offene Entwuerfe und legt neue an; `/workspaces/{id}` zeigt das
-Grid. Die Zeilen liefert ein FastAPI-Endpunkt im effektiven Stand; Zellaenderungen
+`/workspaces` listet offene Entwürfe und legt neue an; `/workspaces/{id}` zeigt das
+Grid. Die Zeilen liefert ein FastAPI-Endpunkt im effektiven Stand; Zelländerungen
 schreibt die Seite direkt in den ChangeSet.
 """
 
@@ -21,6 +21,7 @@ from app.clients import ClientFactory
 from app.colors import PALETTE
 from app.crypto import SecretBox
 from app.db import SessionFactory, session_scope
+from app.i18n import describe_error, get_locale, t
 from app.models import AppUser, Profile, QueryScript, QueryScriptVersion, Role, Workspace
 from app.models.enums import RunSource, WorkspaceStatus
 from app.schema import ColumnDef, ProfileSchema, SchemaCache, resolve_columns
@@ -34,7 +35,8 @@ from app.scripts.service import (
     record_run,
 )
 from app.ui.guard import current_user, redirect_to_login
-from app.ui.shell import apply_palette, page_header
+from app.ui.shell import apply_locale, apply_palette, page_header
+from app.ui.widgets import action_button
 from app.workspaces import (
     EXPIRY_WARNING_DAYS,
     WorkspaceConflictError,
@@ -156,6 +158,28 @@ Object.assign(window.__ws, {
 """
 
 
+GRID_LOCALE_DE: dict[str, str] = {
+    "loadingOoo": "Lädt …",
+    "noRowsToShow": "Keine Zeilen",
+    "selectAll": "Alle auswählen",
+    "blanks": "Leer",
+    "filterOoo": "Filter …",
+    "applyFilter": "Anwenden",
+    "resetFilter": "Zurücksetzen",
+    "clearFilter": "Löschen",
+    "contains": "enthält",
+    "notContains": "enthält nicht",
+    "equals": "gleich",
+    "notEqual": "ungleich",
+    "lessThan": "kleiner als",
+    "greaterThan": "größer als",
+    "page": "Seite",
+    "ariaRowToggleSelection": "Leertaste drücken, um die Zeilenauswahl umzuschalten",
+    "ariaRowSelect": "Zeile auswählen",
+    "ariaRowDeselect": "Zeilenauswahl aufheben",
+}
+
+
 def _api_user(session_factory: SessionFactory) -> AppUser | None:
     try:
         payload = nicegui_app.storage.user
@@ -218,7 +242,7 @@ def column_def(column: ColumnDef) -> dict[str, Any]:
         definition["cellEditor"] = "agNumberCellEditor"
     elif column.edit_type == "date":
         definition["cellEditor"] = "agDateStringCellEditor"
-        definition["headerTooltip"] = "Format JJJJ-MM-TT HH:MM:SS"
+        definition["headerTooltip"] = t("Format JJJJ-MM-TT HH:MM:SS")
     elif column.edit_type == "boolean":
         definition["cellEditor"] = "agCheckboxCellEditor"
     elif column.edit_type == "selection":
@@ -226,7 +250,7 @@ def column_def(column: ColumnDef) -> dict[str, Any]:
         definition["cellEditorParams"] = {"values": list(column.options)}
     elif column.edit_type in {"multiselection", "language"}:
         definition["cellEditor"] = "agTextCellEditor"
-        definition["headerTooltip"] = "Mehrere Werte mit Komma trennen"
+        definition["headerTooltip"] = t("Mehrere Werte mit Komma trennen")
     else:
         definition["cellEditor"] = "agTextCellEditor"
     return definition
@@ -254,13 +278,6 @@ def _profiles_for(session_factory: SessionFactory, user: AppUser) -> dict[int, s
             rows = session.scalars(select(Profile).where(Profile.is_active.is_(True)))
             return {profile.id: profile.name for profile in rows}
         return {profile.id: profile.name for profile in account.profiles if profile.is_active}
-
-
-def _action_button(icon: str, label: str, handler: Any) -> Any:
-    button = ui.button(on_click=handler, icon=icon).props("flat round dense color=primary")
-    button.tooltip(label)
-    button.props(f'aria-label="{label}"')
-    return button
 
 
 def register_workspace_pages(
@@ -336,11 +353,12 @@ def register_workspace_pages(
     @ui.page(LIST_ROUTE)
     def workspaces_page() -> None:  # pyright: ignore[reportUnusedFunction]
         apply_palette()
+        apply_locale()
         user = current_user(session_factory)
         if user is None:
             redirect_to_login()
             return
-        page_header("Arbeitsbestaende", user)
+        page_header(t("Arbeitsbestände"), user)
         status = ui.label("").classes("text-sm")
         profiles = _profiles_for(session_factory, user)
         with session_scope(session_factory) as session:
@@ -352,17 +370,17 @@ def register_workspace_pages(
 
         with ui.row().classes("w-full items-end gap-2 mt-2"):
             script_select = (
-                ui.select(script_options, label="Script", value=next(iter(script_options), None))
+                ui.select(script_options, label=t("Script"), value=next(iter(script_options), None))
                 .props("outlined dense")
                 .classes("w-56")
             )
             profile_select = (
-                ui.select(profiles, label="Profil", value=next(iter(profiles), None))
+                ui.select(profiles, label=t("Profil"), value=next(iter(profiles), None))
                 .props("outlined dense")
                 .classes("w-48")
             )
-            name_input = ui.input("Name (optional)").props("outlined dense").classes("w-56")
-            load_button = ui.button("Arbeitsbestand laden", icon="download").props("dense")
+            name_input = ui.input(t("Name (optional)")).props("outlined dense").classes("w-56")
+            load_button = action_button("download", t("Arbeitsbestand laden"))
         params_container = ui.column().classes("w-full gap-2")
         param_widgets: dict[str, Any] = {}
 
@@ -379,11 +397,11 @@ def register_workspace_pages(
             try:
                 specs, _columns = interface_for(source, runner)
             except ScriptError as exc:
-                status.set_text(f"Fehler: {exc}")
+                status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
             with params_container:
                 if not specs:
-                    ui.label("Dieses Script hat keine Parameter.").classes("text-xs")
+                    ui.label(t("Dieses Script hat keine Parameter.")).classes("text-xs")
                     return
                 for spec in specs.values():
                     if spec.type == "bool":
@@ -406,18 +424,18 @@ def register_workspace_pages(
             script_id = script_select.value
             profile_id = profile_select.value
             if not isinstance(script_id, int) or not isinstance(profile_id, int):
-                status.set_text("Bitte Script und Profil auswaehlen.")
+                status.set_text(t("Bitte Script und Profil auswählen."))
                 return
             with session_scope(session_factory) as session:
                 script = session.get(QueryScript, script_id)
                 version = published_version(session, script) if script is not None else None
                 if script is None or version is None:
-                    status.set_text("Das Script ist nicht veroeffentlicht.")
+                    status.set_text(t("Das Script ist nicht veröffentlicht."))
                     return
                 source = version.source
                 profile = session.get(Profile, profile_id)
                 if profile is None:
-                    status.set_text("Profil nicht gefunden.")
+                    status.set_text(t("Profil nicht gefunden."))
                     return
                 host = profile.host
                 api_key_enc = profile.api_key_enc
@@ -430,10 +448,10 @@ def register_workspace_pages(
                         specs, {name: widget.value for name, widget in param_widgets.items()}
                     )
                 except ScriptError as exc:
-                    status.set_text(f"Fehler: {exc}")
+                    status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                     return
             api_key = secret_box.decrypt(api_key_enc)
-            status.set_text("Script laeuft ...")
+            status.set_text(t("Script läuft …"))
             outcome = await run.io_bound(
                 lambda: runner.run(
                     source,
@@ -445,15 +463,17 @@ def register_workspace_pages(
                 )
             )
             if outcome is None or not outcome.ok:
-                status.set_text(f"Fehler: {outcome.error if outcome else 'abgebrochen'}")
+                status.set_text(
+                    t("Fehler: {message}", message=outcome.error if outcome else t("abgebrochen"))
+                )
                 return
-            status.set_text("Assets werden geladen ...")
+            status.set_text(t("Assets werden geladen …"))
             try:
                 with session_scope(session_factory) as session:
                     actor = session.get(AppUser, user.id)
                     profile = session.get(Profile, profile_id)
                     if actor is None or profile is None:
-                        status.set_text("Benutzer oder Profil fehlt.")
+                        status.set_text(t("Benutzer oder Profil fehlt."))
                         return
                     client = client_factory.client_for(profile)
                     schema = schema_cache.get(profile)
@@ -482,9 +502,9 @@ def register_workspace_pages(
                     workspace_id = workspace.id
                     rows_loaded = workspace.row_count
             except (ScriptError, WorkspaceError) as exc:
-                status.set_text(f"Fehler: {exc}")
+                status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
-            status.set_text(f"{rows_loaded} Assets geladen.")
+            status.set_text(t("{count} Assets geladen.", count=rows_loaded))
             ui.navigate.to(f"/workspaces/{workspace_id}")
 
         load_button.on_click(load_workspace)
@@ -495,7 +515,7 @@ def register_workspace_pages(
                 if workspace is None:
                     return
                 delete_workspace(session, workspace)
-            status.set_text("Arbeitsbestand geloescht.")
+            status.set_text(t("Arbeitsbestand gelöscht."))
             workspace_rows.refresh()
 
         @ui.refreshable
@@ -504,7 +524,7 @@ def register_workspace_pages(
                 items = [
                     {
                         "id": workspace.id,
-                        "name": workspace.name or f"Arbeitsbestand {workspace.id}",
+                        "name": workspace.name or t("Arbeitsbestand {id}", id=workspace.id),
                         "status": workspace.status.value,
                         "rows": workspace.row_count,
                         "changed": changed_count(session, workspace.id),
@@ -514,37 +534,38 @@ def register_workspace_pages(
                     for workspace in list_workspaces(session, user.id)
                 ]
             if not items:
-                ui.label("Keine offenen Arbeitsbestaende.").classes("text-sm")
+                ui.label(t("Keine offenen Arbeitsbestände.")).classes("text-sm")
                 return
             for item in items:
                 with ui.row().classes(ROW_CLASSES):
                     ui.label(item["name"]).classes("w-56 font-medium")
                     ui.label(item["status"]).classes("w-20 text-xs")
-                    ui.label(f"{item['rows']} Zeilen").classes("w-24 text-xs")
-                    ui.label(f"{item['changed']} Aenderungen").classes("w-28 text-xs")
+                    ui.label(t("{count} Zeilen", count=item["rows"])).classes("w-24 text-xs")
+                    ui.label(t("{count} Änderungen", count=item["changed"])).classes("w-28 text-xs")
                     ui.label(item["updated"]).classes("w-32 text-xs")
                     ui.label(item["expiry"]).classes("w-44 text-xs text-warning")
-                    _action_button(
+                    action_button(
                         "grid_on",
-                        "Oeffnen",
+                        t("Öffnen"),
                         lambda workspace_id=int(item["id"]): ui.navigate.to(
                             f"/workspaces/{workspace_id}"
                         ),
                     )
-                    _action_button(
+                    action_button(
                         "delete",
-                        "Arbeitsbestand loeschen",
+                        t("Arbeitsbestand löschen"),
                         lambda workspace_id=int(item["id"]): _remove(workspace_id),
                     )
 
         with ui.row().classes("w-full items-center gap-2 mt-4"):
-            ui.label("Offene Arbeitsbestaende").classes("font-semibold")
-            _action_button("refresh", "Liste aktualisieren", workspace_rows.refresh)
+            ui.label(t("Offene Arbeitsbestände")).classes("font-semibold")
+            action_button("refresh", t("Liste aktualisieren"), workspace_rows.refresh)
         workspace_rows()
 
     @ui.page("/workspaces/{workspace_id}")
     def grid_page(workspace_id: int) -> None:  # pyright: ignore[reportUnusedFunction]
         apply_palette()
+        apply_locale()
         user = current_user(session_factory)
         if user is None:
             redirect_to_login()
@@ -552,15 +573,15 @@ def register_workspace_pages(
         with session_scope(session_factory) as session:
             workspace = _owned_workspace(session, workspace_id, user)
             if workspace is None:
-                page_header("Arbeitsbestaende", user)
-                ui.label("Der Arbeitsbestand wurde nicht gefunden.").classes("text-negative")
+                page_header(t("Arbeitsbestände"), user)
+                ui.label(t("Der Arbeitsbestand wurde nicht gefunden.")).classes("text-negative")
                 return
             profile = session.get(Profile, workspace.profile_id)
             if profile is None:
-                page_header("Arbeitsbestaende", user)
-                ui.label("Das Profil fehlt.").classes("text-negative")
+                page_header(t("Arbeitsbestände"), user)
+                ui.label(t("Das Profil fehlt.")).classes("text-negative")
                 return
-            name = workspace.name or f"Arbeitsbestand {workspace.id}"
+            name = workspace.name or t("Arbeitsbestand {id}", id=workspace.id)
             workspace_status = workspace.status
             row_count = workspace.row_count
             revision = int(workspace.edit_revision)
@@ -581,16 +602,27 @@ def register_workspace_pages(
             }
         )
         status = ui.label(
-            f"{row_count} Zeilen | {changed} Aenderungen | Revision {revision}"
+            t(
+                "{rows} Zeilen | {changes} Änderungen | Revision {revision}",
+                rows=row_count,
+                changes=changed,
+                revision=revision,
+            )
         ).classes("text-sm")
         if workspace_status is not WorkspaceStatus.READY:
-            ui.label(f"Status: {workspace_status.value}").classes("text-warning text-sm")
+            ui.label(t("Status: {status}", status=workspace_status.value)).classes(
+                "text-warning text-sm"
+            )
         if warning is not None:
             ui.label(
-                f"Der Entwurf laeuft in {warning} Tagen ab (Warnung ab {EXPIRY_WARNING_DAYS} Tagen)."
+                t(
+                    "Der Entwurf läuft in {days} Tagen ab (Warnung ab {threshold} Tagen).",
+                    days=warning,
+                    threshold=EXPIRY_WARNING_DAYS,
+                )
             ).classes("text-negative text-sm")
         ui.label(
-            "Der Entwurf wurde in einem anderen Tab geaendert. Bitte die Seite neu laden."
+            t("Der Entwurf wurde in einem anderen Tab geändert. Bitte die Seite neu laden.")
         ).classes("ws-conflict").props('id="ws-conflict"')
 
         column_options = {column.key: column.label for column in columns}
@@ -599,66 +631,71 @@ def register_workspace_pages(
 
         with ui.row().classes("w-full flex-wrap items-end gap-2"):
             filter_column_select = (
-                ui.select(column_options, value=columns[0].key, label="Spalte")
+                ui.select(column_options, value=columns[0].key, label=t("Spalte"))
                 .props("outlined dense")
                 .classes("w-44")
             )
-            filter_input = ui.input("Filter (enthaelt)").props("outlined dense").classes("w-48")
-            only_changed_switch = ui.switch("nur geaenderte Zeilen", value=False)
+            filter_input = ui.input(t("Filter (enthält)")).props("outlined dense").classes("w-48")
+            only_changed_switch = ui.switch(t("nur geänderte Zeilen"), value=False)
             target_column_select = (
                 ui.select(
                     {column.key: column.label for column in writable},
                     value=writable[0].key if writable else None,
-                    label="Zielspalte",
+                    label=t("Zielspalte"),
                 )
                 .props("outlined dense")
                 .classes("w-44")
             )
-            value_input = ui.input("Wert").props("outlined dense").classes("w-36")
+            value_input = ui.input(t("Wert")).props("outlined dense").classes("w-36")
             target_scope_select = (
                 ui.select(
-                    {"selection": "markierte Zeilen", "filtered": "gefilterte", "all": "alle"},
+                    {
+                        "selection": t("markierte Zeilen"),
+                        "filtered": t("gefilterte"),
+                        "all": t("alle"),
+                    },
                     value="selection",
-                    label="Ziel",
+                    label=t("Ziel"),
                 )
                 .props("outlined dense")
                 .classes("w-40")
             )
 
-        grid = ui.aggrid(
-            {
-                "columnDefs": [
-                    {
-                        "field": "fileId",
-                        "headerName": "ID",
-                        "width": 110,
-                        "pinned": "left",
-                        "editable": False,
-                    },
-                    *[column_def(column) for column in columns],
-                ],
-                "defaultColDef": {"resizable": True, "sortable": True},
-                "rowModelType": "infinite",
-                "cacheBlockSize": BLOCK_SIZE,
-                "maxBlocksInCache": 3,
-                "rowBuffer": 5,
-                "animateRows": False,
-                "rowSelection": {"mode": "multiRow"},
-                "rowClassRules": {"ws-row-changed": "!!data && data.__changed === true"},
-                ":datasource": "window.__ws.datasource",
-            },
-            auto_size_columns=False,
-        ).classes("ws-grid w-full")
+        grid_options: dict[str, Any] = {
+            "columnDefs": [
+                {
+                    "field": "fileId",
+                    "headerName": "ID",
+                    "width": 110,
+                    "pinned": "left",
+                    "editable": False,
+                },
+                *[column_def(column) for column in columns],
+            ],
+            "defaultColDef": {"resizable": True, "sortable": True},
+            "rowModelType": "infinite",
+            "cacheBlockSize": BLOCK_SIZE,
+            "maxBlocksInCache": 3,
+            "rowBuffer": 5,
+            "animateRows": False,
+            "rowSelection": {"mode": "multiRow", "headerCheckbox": False},
+            "rowClassRules": {"ws-row-changed": "!!data && data.__changed === true"},
+            ":datasource": "window.__ws.datasource",
+        }
+        if get_locale() == "de":
+            grid_options["localeText"] = GRID_LOCALE_DE
+        grid = ui.aggrid(grid_options, auto_size_columns=False).classes("ws-grid w-full")
 
         async def refresh_status() -> None:
             with session_scope(session_factory) as session:
                 current = session.get(Workspace, workspace_id)
                 if current is None:
                     return
-                text = (
-                    f"{current.row_count} Zeilen | "
-                    f"{changed_count(session, workspace.id)} Aenderungen | "
-                    f"Revision {int(current.edit_revision)}"
+                text = t(
+                    "{rows} Zeilen | {changes} Änderungen | Revision {revision}",
+                    rows=current.row_count,
+                    changes=changed_count(session, workspace.id),
+                    revision=int(current.edit_revision),
                 )
             status.set_text(text)
 
@@ -707,7 +744,10 @@ def register_workspace_pages(
             )
             if isinstance(narrowest, int | float) and narrowest < MIN_COLUMN_WIDTH:
                 ui.notify(
-                    f"Spalten sind nur {int(narrowest)} px breit; Inhalte werden abgeschnitten.",
+                    t(
+                        "Spalten sind nur {width} px breit; Inhalte werden abgeschnitten.",
+                        width=int(narrowest),
+                    ),
                     color="warning",
                 )
 
@@ -742,7 +782,7 @@ def register_workspace_pages(
                 except (ScriptError, WorkspaceError) as exc:
                     ui.notify(str(exc), color="negative")
                 else:
-                    ui.notify(f"{column.label} gespeichert.")
+                    ui.notify(t("{field} gespeichert.", field=column.label))
             await reload_changes_and_grid()
 
         grid.on(
@@ -771,12 +811,12 @@ def register_workspace_pages(
         async def apply_value() -> None:
             column = _column_for(columns, target_column_select.value)
             if column is None:
-                ui.notify("Bitte eine Zielspalte waehlen.", color="warning")
+                ui.notify(t("Bitte eine Zielspalte wählen."), color="warning")
                 return
             scope = str(target_scope_select.value or "selection")
             file_ids = selected_file_ids(await grid.get_selected_rows())
             if scope == "selection" and not file_ids:
-                ui.notify("Keine Zeile markiert.", color="warning")
+                ui.notify(t("Keine Zeile markiert."), color="warning")
                 return
             apply_filter()
             target_ids = targets_for(scope, file_ids)
@@ -796,7 +836,13 @@ def register_workspace_pages(
                 except ScriptError as exc:
                     ui.notify(str(exc), color="negative")
                     return
-            ui.notify(f"{changed_cells} von {len(target_ids)} Zeilen geaendert.")
+            ui.notify(
+                t(
+                    "{changed} von {total} Zeilen geändert.",
+                    changed=changed_cells,
+                    total=len(target_ids),
+                )
+            )
             await reload_changes_and_grid()
 
         async def revert_selection() -> None:
@@ -808,7 +854,7 @@ def register_workspace_pages(
                 if current is None:
                     return
                 removed = clear_changes(session, current, file_ids=target_ids)
-            ui.notify(f"{removed} Aenderungen verworfen.")
+            ui.notify(t("{count} Änderungen verworfen.", count=removed))
             await reload_changes_and_grid()
 
         def close_workspace_now() -> None:
@@ -819,14 +865,14 @@ def register_workspace_pages(
             ui.navigate.to(LIST_ROUTE)
 
         with ui.row().classes("w-full items-center gap-1 mt-1"):
-            _action_button("filter_alt_off", "Filter zuruecksetzen", reset_filter)
-            _action_button("arrow_upward", "Aufsteigend sortieren", lambda: sort_by("asc"))
-            _action_button("arrow_downward", "Absteigend sortieren", lambda: sort_by("desc"))
-            _action_button("straighten", "Spalten an Inhalt anpassen", fit_content)
-            _action_button("open_in_full", "Spalten an Anzeige anpassen", fit_display)
-            _action_button("edit_note", "Wert auf Ziel setzen", apply_value)
-            _action_button("undo", "Aenderungen verwerfen", revert_selection)
-            _action_button("close", "Arbeitsbestand schliessen", close_workspace_now)
+            action_button("filter_alt_off", t("Filter zurücksetzen"), reset_filter)
+            action_button("arrow_upward", t("Aufsteigend sortieren"), lambda: sort_by("asc"))
+            action_button("arrow_downward", t("Absteigend sortieren"), lambda: sort_by("desc"))
+            action_button("straighten", t("Spalten an Inhalt anpassen"), fit_content)
+            action_button("open_in_full", t("Spalten an Anzeige anpassen"), fit_display)
+            action_button("edit_note", t("Wert auf Ziel setzen"), apply_value)
+            action_button("undo", t("Änderungen verwerfen"), revert_selection)
+            action_button("close", t("Arbeitsbestand schließen"), close_workspace_now)
 
         filter_input.on("keydown.enter", lambda _: apply_filter_now())
         only_changed_switch.on_value_change(lambda _: apply_filter_now())

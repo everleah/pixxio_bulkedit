@@ -6,6 +6,7 @@ Ausgefuehrt wird immer in einem Kindprozess; die UI sieht nur Ergebnis und Proto
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from nicegui import run, ui
@@ -13,6 +14,7 @@ from sqlalchemy import select
 
 from app.crypto import SecretBox
 from app.db import SessionFactory, session_scope
+from app.i18n import describe_error, t
 from app.models import AppUser, Profile, QueryScript, QueryScriptVersion, Role
 from app.models.enums import RunSource
 from app.profiles import ProfileError
@@ -30,12 +32,12 @@ from app.scripts.service import (
     publish_version,
     published_version,
     record_run,
-    run_summary,
     save_version,
 )
 from app.scripts.templates import TEMPLATES
 from app.ui.guard import current_user, redirect_to_login
-from app.ui.shell import apply_palette, page_header
+from app.ui.shell import apply_locale, apply_palette, page_header
+from app.ui.widgets import action_button
 
 ROW_CLASSES = "w-full items-center gap-3 border-b py-1 text-sm"
 STARTER = '''"""Neue Abfrage."""
@@ -50,12 +52,6 @@ def query(px, params):
     px.log(f"Collection '{col['name']}' (ID {col['id']})")
     return px.filters.collection(col["id"])
 '''
-
-
-def _action_button(icon: str, label: str, handler: Any) -> None:
-    button = ui.button(on_click=handler, icon=icon).props("flat round dense color=primary")
-    button.tooltip(label)
-    button.props(f'aria-label="{label}"')
 
 
 def _profiles_for(session_factory: SessionFactory, user: AppUser) -> dict[int, str]:
@@ -83,6 +79,21 @@ def _load_profile(session_factory: SessionFactory, profile_id: int) -> tuple[Any
         )
 
 
+def _run_summary(outcome: ScriptOutcome, *, max_rows: int) -> str:
+    """Kurzfassung eines Laufs für die Statuszeile."""
+    if not outcome.ok:
+        return t("Fehler: {message}", message=outcome.error or "")
+    parts = [t("{ms} ms", ms=outcome.duration_ms)]
+    if outcome.result and outcome.result.ids:
+        parts.append(t("{count} IDs", count=len(outcome.ids)))
+    if outcome.filter:
+        parts.append(t("Filter:") + " " + json.dumps(outcome.filter, ensure_ascii=False))
+    if outcome.columns:
+        parts.append(t("{count} Spalten", count=len(outcome.columns)))
+    parts.append(t("Limit {rows} Zeilen", rows=max_rows))
+    return " | ".join(parts)
+
+
 def register_script_pages(
     session_factory: SessionFactory,
     secret_box: SecretBox,
@@ -91,11 +102,12 @@ def register_script_pages(
     @ui.page("/scripts")
     def scripts_page() -> None:  # pyright: ignore[reportUnusedFunction]
         apply_palette()
+        apply_locale()
         user = current_user(session_factory)
         if user is None:
             redirect_to_login()
             return
-        page_header("Scripts", user)
+        page_header(t("Scripts"), user)
         editable = can_edit_scripts(user)
         with session_scope(session_factory) as session:
             ensure_templates(session, owner=session.get(AppUser, user.id))
@@ -116,7 +128,7 @@ def register_script_pages(
                     for script in list_scripts(session)
                 ]
             if not rows:
-                ui.label("Noch keine Scripts vorhanden.").classes("text-sm")
+                ui.label(t("Noch keine Scripts vorhanden.")).classes("text-sm")
                 return
             for row in rows:
                 published: QueryScriptVersion | None = row["published"]
@@ -124,22 +136,22 @@ def register_script_pages(
                     ui.label(row["name"]).classes("w-44 font-medium")
                     ui.label(row["description"]).classes("w-64 text-xs")
                     version_text = (
-                        f"v{published.version_no}"
+                        t("v{version}", version=published.version_no)
                         if published is not None
-                        else "nicht veroeffentlicht"
+                        else t("nicht veröffentlicht")
                     )
                     ui.label(version_text).classes("w-32 text-xs")
-                    ui.label(f"{row['versions']} Versionen").classes("w-24 text-xs")
-                    ui.label("Vorlage" if row["template"] else "").classes("w-20 text-xs")
-                    _action_button(
+                    ui.label(t("{count} Versionen", count=row["versions"])).classes("w-24 text-xs")
+                    ui.label(t("Vorlage") if row["template"] else "").classes("w-20 text-xs")
+                    action_button(
                         "edit",
-                        "Oeffnen",
+                        t("Öffnen"),
                         lambda script_id=int(row["id"]): ui.navigate.to(f"/scripts/{script_id}"),
                     )
                     if row["template"] and editable:
-                        _action_button(
+                        action_button(
                             "content_copy",
-                            "Vorlage kopieren",
+                            t("Vorlage kopieren"),
                             lambda script_id=int(row["id"]): _copy_template(script_id),
                         )
 
@@ -153,7 +165,7 @@ def register_script_pages(
                     session, template
                 )
                 if template_version is None:
-                    status.set_text("Die Vorlage hat keine Version.")
+                    status.set_text(t("Die Vorlage hat keine Version."))
                     return
                 source = template_version.source
                 base_name = f"{template.name} (Kopie)"
@@ -172,23 +184,24 @@ def register_script_pages(
                         description=template.description,
                     )
                 except ScriptError as exc:
-                    status.set_text(f"Fehler: {exc}")
+                    status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                     return
                 new_id = created.id
-            status.set_text(f"Kopie {name!r} angelegt.")
+            status.set_text(t("Kopie '{name}' angelegt.", name=name))
             ui.navigate.to(f"/scripts/{new_id}")
 
         with ui.row().classes("w-full items-center gap-2 mt-2"):
-            ui.label("Verfuegbare Scripts").classes("font-semibold")
+            ui.label(t("Verfügbare Scripts")).classes("font-semibold")
             if editable:
-                ui.button("Neues Script", on_click=lambda: ui.navigate.to("/scripts/0")).props(
-                    "dense"
+                action_button(
+                    "add", t("Neues Script"), lambda: ui.navigate.to("/scripts/0")
                 ).classes("ml-auto")
         script_rows()
 
     @ui.page("/scripts/{script_id}")
     def editor_page(script_id: int) -> None:  # pyright: ignore[reportUnusedFunction]
         apply_palette()
+        apply_locale()
         user = current_user(session_factory)
         if user is None:
             redirect_to_login()
@@ -210,9 +223,9 @@ def register_script_pages(
                     state["versions"] = [
                         {
                             "id": version.id,
-                            "label": f"v{version.version_no}"
+                            "label": t("v{version}", version=version.version_no)
                             + (
-                                " (veroeffentlicht)"
+                                " " + t("(veröffentlicht)")
                                 if version.id == script.current_version_id
                                 else ""
                             ),
@@ -221,17 +234,19 @@ def register_script_pages(
                         for version in script.versions
                     ]
             except ScriptError as exc:
-                page_header("Scripts", user)
-                ui.label(f"Fehler: {exc}").classes("text-negative")
+                page_header(t("Scripts"), user)
+                ui.label(t("Fehler: {message}", message=describe_error(exc))).classes(
+                    "text-negative"
+                )
                 return
         else:
             state.update(source=STARTER, versions=[], description=None)
 
-        page_header(state["script"] or "Neues Script", user)
+        page_header(state["script"] or t("Neues Script"), user)
         if state["version"] is not None:
-            ui.label(f"Angezeigt: v{state['version']}").classes("text-xs")
+            ui.label(t("Angezeigt: v{version}", version=state["version"])).classes("text-xs")
         if state["template"]:
-            ui.label("Vorlagen sind unveraenderlich - bitte eine Kopie anlegen.").classes(
+            ui.label(t("Vorlagen sind unveränderlich – bitte eine Kopie anlegen.")).classes(
                 "text-xs text-warning"
             )
         status = ui.label("").classes("text-sm")
@@ -241,15 +256,15 @@ def register_script_pages(
         result_label.set_visibility(False)
 
         profiles = _profiles_for(session_factory, user)
-        profile_select = ui.select(profiles, label="Profil", value=next(iter(profiles), None))
+        profile_select = ui.select(profiles, label=t("Profil"), value=next(iter(profiles), None))
         profile_select.props("outlined dense").classes("w-64")
         if not profiles:
             profile_select.set_visibility(False)
-            ui.label("Keinem Profil zugeordnet - ein Superuser muss ein Profil zuweisen.").classes(
-                "text-xs text-warning"
-            )
+            ui.label(
+                t("Keinem Profil zugeordnet – ein Superuser muss ein Profil zuweisen.")
+            ).classes("text-xs text-warning")
 
-        name_input = ui.input("Name", value=state["script"] or "").props("outlined dense")
+        name_input = ui.input(t("Name"), value=state["script"] or "").props("outlined dense")
         name_input.set_visibility(script_id == 0)
         editor: Any = None
         code_view: Any = None
@@ -260,7 +275,7 @@ def register_script_pages(
                 .style("min-height: 380px")
             )
         else:
-            ui.label("Veroeffentlichte Fassung (nur lesbar)").classes("text-xs")
+            ui.label(t("Veröffentlichte Fassung (nur lesbar)")).classes("text-xs")
             code_view = ui.code(state["source"], language="python").classes("w-full")
 
         def current_source() -> str:
@@ -288,13 +303,13 @@ def register_script_pages(
             try:
                 specs, _columns = interface_for(current_source(), runner)
             except ScriptError as exc:
-                status.set_text(f"Fehler: {exc}")
+                status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
             with params_container:
                 if not specs:
-                    ui.label("Dieses Script hat keine Parameter.").classes("text-xs")
+                    ui.label(t("Dieses Script hat keine Parameter.")).classes("text-xs")
                     return
-                ui.label("Parameter").classes("font-semibold")
+                ui.label(t("Parameter")).classes("font-semibold")
                 for spec in specs.values():
                     param_widgets[spec.name] = _param_widget(spec)
 
@@ -319,27 +334,31 @@ def register_script_pages(
             try:
                 interface = runner.inspect(current_source())
             except ScriptError as exc:
-                status.set_text(f"Fehler: {exc}")
+                status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
             build_params()
-            columns = ", ".join(interface.columns or []) or "keine"
+            columns = ", ".join(interface.columns or []) or t("keine")
             status.set_text(
-                f"Script ist gueltig: {len(interface.params)} Parameter, Spalten: {columns}."
+                t(
+                    "Script ist gültig: {params} Parameter, Spalten: {columns}.",
+                    params=len(interface.params),
+                    columns=columns,
+                )
             )
 
         async def dry_run() -> None:
             if not profiles:
-                status.set_text("Kein Profil zugewiesen.")
+                status.set_text(t("Kein Profil zugewiesen."))
                 return
             profile_id = profile_select.value
             if not isinstance(profile_id, int):
-                status.set_text("Bitte ein Profil auswaehlen.")
+                status.set_text(t("Bitte ein Profil auswählen."))
                 return
             try:
                 interface = runner.inspect(current_source())
                 typed = coerce_params(interface.params, collect_params())
             except ScriptError as exc:
-                status.set_text(f"Fehler: {exc}")
+                status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
             try:
                 _, host, api_key_enc, max_retries, max_rows = _load_profile(
@@ -347,9 +366,9 @@ def register_script_pages(
                 )
                 api_key = secret_box.decrypt(api_key_enc)
             except ScriptError as exc:
-                status.set_text(f"Fehler: {exc}")
+                status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
-            status.set_text("Lauf gestartet ...")
+            status.set_text(t("Lauf gestartet …"))
             source = current_source()
             outcome = await run.io_bound(
                 lambda: runner.run(
@@ -362,7 +381,7 @@ def register_script_pages(
                 )
             )
             if outcome is None:  # pragma: no cover - io_bound liefert immer ein Ergebnis
-                status.set_text("Der Lauf wurde abgebrochen.")
+                status.set_text(t("Der Lauf wurde abgebrochen."))
                 return
             with session_scope(session_factory) as session:
                 record_run(
@@ -375,21 +394,22 @@ def register_script_pages(
                     outcome=outcome,
                 )
             status.set_text(
-                ("Dry Run: " if outcome.ok else "") + run_summary(outcome, max_rows=max_rows)
+                (t("Dry Run: ") if outcome.ok else "") + _run_summary(outcome, max_rows=max_rows)
             )
-            log_box.set_content(outcome.log or "(keine Ausgabe)")
+            log_box.set_content(outcome.log or t("(keine Ausgabe)"))
             log_box.set_visibility(bool(outcome.log))
             result_label.set_text(_result_text(outcome))
             result_label.set_visibility(True)
 
         def _result_text(outcome: ScriptOutcome) -> str:
             if not outcome.ok:
-                return f"Fehler: {outcome.error}"
+                return t("Fehler: {message}", message=outcome.error or "")
             if outcome.result and outcome.result.ids:
                 preview = ", ".join(str(item) for item in outcome.ids[:10])
-                return f"{len(outcome.ids)} IDs: {preview}{' ...' if len(outcome.ids) > 10 else ''}"
+                suffix = " …" if len(outcome.ids) > 10 else ""
+                return t("IDs: {preview}{suffix}", preview=preview, suffix=suffix)
             note = outcome.result.note if outcome.result and outcome.result.note else ""
-            return f"Filter: {outcome.filter} {note}".strip()
+            return f"{t('Filter:')} {outcome.filter} {note}".strip()
 
         def save(publish: bool) -> None:
             try:
@@ -406,7 +426,7 @@ def register_script_pages(
                             publish=publish,
                         )
                         new_id = script.id
-                        message = f"Script {script.name!r} angelegt."
+                        message = t("Script '{name}' angelegt.", name=script.name)
                     else:
                         if state["template"]:
                             raise ScriptError("Vorlagen sind unveraenderlich.")
@@ -417,11 +437,11 @@ def register_script_pages(
                             session, script, current_source(), actor=actor, publish=publish
                         )
                         new_id = script.id
-                        message = f"Version v{version.version_no} gespeichert."
+                        message = t("Version v{version} gespeichert.", version=version.version_no)
             except ScriptError as exc:
-                status.set_text(f"Fehler: {exc}")
+                status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
-            status.set_text(message + (" (veroeffentlicht)" if publish else ""))
+            status.set_text(message + (" " + t("(veröffentlicht)") if publish else ""))
             if script_id == 0:
                 ui.navigate.to(f"/scripts/{new_id}")
 
@@ -431,29 +451,31 @@ def register_script_pages(
                     actor = session.get(AppUser, user.id)
                     script = session.get(QueryScript, script_id) if script_id else None
                     if actor is None or script is None:
-                        raise ScriptError("Das Script wurde nicht gefunden.")
+                        raise ScriptError(t("Das Script wurde nicht gefunden."))
                     version = latest_version(session, script)
                     if version is None:
-                        raise ScriptError("Es gibt noch keine Version.")
+                        raise ScriptError(t("Es gibt noch keine Version."))
                     publish_version(session, script, version, actor=actor)
                     number = version.version_no
             except ScriptError as exc:
-                status.set_text(f"Fehler: {exc}")
+                status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
-            status.set_text(f"Version v{number} ist jetzt veroeffentlicht.")
+            status.set_text(t("Version v{version} ist jetzt veröffentlicht.", version=number))
 
         with ui.row().classes("w-full items-center gap-2 mt-2"):
-            _action_button("rule", "Pruefen", check)
-            _action_button("play_arrow", "Dry Run", dry_run)
+            action_button("rule", t("Prüfen"), check)
+            action_button("play_arrow", t("Dry Run"), dry_run)
             if editable:
-                _action_button("save", "Speichern (neue Version)", lambda: save(False))
-                _action_button("publish", "Speichern und veroeffentlichen", lambda: save(True))
+                action_button("save", t("Speichern (neue Version)"), lambda: save(False))
+                action_button("publish", t("Speichern und veröffentlichen"), lambda: save(True))
                 if script_id:
-                    _action_button("verified", "Aktuelle Version veroeffentlichen", publish_current)
+                    action_button(
+                        "verified", t("Aktuelle Version veröffentlichen"), publish_current
+                    )
             if state["versions"]:
                 version_select = ui.select(
                     {item["id"]: item["label"] for item in state["versions"]},
-                    label="Version laden",
+                    label=t("Version laden"),
                     value=None,
                 ).props("outlined dense")
                 version_select.classes("w-56")

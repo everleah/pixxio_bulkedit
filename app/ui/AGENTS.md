@@ -9,8 +9,13 @@
 
 - `guard.py`: `current_user` (Signierte Session plus Aktivpruefung), `is_superuser`,
   `logout`, `redirect_to_login`.
-- `shell.py`: `apply_palette` (Quasar-Farben aus `app/colors.py`) und `page_header`
-  (Navigation mit Admin-Links nur fuer Superuser).
+- `widgets.py`: `action_button` (Icon, Tooltip, `aria-label`) und `nav_link`; alle
+  Werkzeugleisten nutzen diese Helfer statt Textbuttons.
+- `shell.py`: `apply_palette`, `apply_locale` (Sprache aus der Session), `page_header`
+  mit Navigation, Sprachumschalter (DE/EN) und Abmelde-Icon.
+- `i18n.py`: Katalog der Oberflächentexte (Deutsch als Quelle, Englisch als Übersetzung);
+  `t()` formatiert Platzhalter, `describe_error` übersetzt bekannte Fehler über
+  `translation_key`.
 - `admin.py`: `register_admin_pages` registriert `/admin/profiles` und `/admin/users`.
   Beide Seiten pruefen die Rolle serverseitig, zeigen eine Liste und ein gemeinsames
   Formular fuer Anlegen und Bearbeiten.
@@ -33,6 +38,10 @@
 - Der Verbindungstest laeuft ueber `asyncio` (`run.io_bound`) und schreibt das Ergebnis
   mit `record_connection_check` (Audit inklusive).
 - Aktionen in Listen sind Icon-Buttons mit Tooltip und `aria-label`.
+- Jeder sichtbare Text läuft über `t(...)`; deutsche Quelltexte mit Umlauten, englische
+  Übersetzung in `app/i18n.py`. Keine Textbutton-Beschriftungen für Aktionen.
+- Die Sprache wird pro Session gespeichert (`locale` in `app.storage.user`) und über
+  DE/EN in der Kopfzeile gewechselt; `apply_locale()` steht am Anfang jeder Seite.
 - Farben ausschliesslich aus `app/colors.py`; Schaltflaechen tragen nur Text, wenn sie
   kein Listenwerkzeug sind.
 - Script-Seiten rufen Ausfuehrungen ueber `run.io_bound` und `ScriptRunner` auf; der

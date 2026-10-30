@@ -29,6 +29,8 @@
   Schemaaufloesung und SchemaCache, Arbeitsbestaende (Snapshot, ChangeSet, Revision,
   effektive Seiten mit Filter/Sortierung, Massenaktionen, Ablauf) und der Loader gegen
   einen nachgebauten Client.
+- `test_i18n.py`: Vollstaendigkeit des englischen Katalogs (jeder `t(...)`-Text muss
+  uebersetzt sein), Platzhalterformatierung, Sprachumschaltung und Rueckfall auf Deutsch.
 
 ## Local Contracts
 

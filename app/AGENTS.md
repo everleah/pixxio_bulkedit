@@ -29,10 +29,13 @@
   Verbindungstest protokollieren, Host normalisieren; schreibt `AdminAudit`-Eintraege.
 - `clients.py`: `ClientFactory` haelt je Profil einen pixx.io-Client, ent- und
   verschluesselt den Key nur dort und liefert `current_user_name` fuer Verbindungstests.
-- `ui/`: `guard.py` (Session- und Rollenpruefung), `shell.py` (Palette und Kopfzeile),
+- `ui/`: `guard.py` (Session- und Rollenpruefung), `shell.py` (Palette, Kopfzeile mit
+  Sprachumschalter), `widgets.py` (Icon-Button mit Tooltip, Navigationslink),
   `admin.py` (Seiten `/admin/profiles` und `/admin/users`), `scripts.py` (Liste und Editor
   unter `/scripts`), `workspaces.py` (Liste `/workspaces`, Grid `/workspaces/{id}`,
   Datenendpunkte `/workspace/rows` und `/workspace/changes`); Details in `ui/AGENTS.md`.
+- `i18n.py`: Oberflächentexte; deutscher Quelltext plus englische Übersetzung. Jeder
+  sichtbare Text läuft über `t(...)`, die Sprache liegt in der Session.
 - `scripts/`: Abfrage-Scripts mit Vertrag, RestrictedPython, read-only Fassade `px`,
   Kindprozess-Ausfuehrung, Versionierung und Vorlagen; Details in `scripts/AGENTS.md`.
 - `cli.py` mit `__main__.py`: `init-db`, `generate-master-key`, `create-superuser`,
@@ -74,8 +77,13 @@
   entstehen getrennt davon.
 - UI-Farben ausschliesslich aus `app/colors.py` beziehen, auch fuer AG Grid
   (`--ag-*`-Variablen auf dem Grid-Container).
+- Sichtbare Texte laufen ueber `t(...)` aus `app/i18n.py`: deutscher Quelltext mit echten
+  Umlauten als Schluessel, englische Uebersetzung im Katalog. Neue Texte immer in beiden
+  Sprachen ergaenzen (`test_jeder_text_ist_uebersetzt` prueft die Vollstaendigkeit).
+  Skript-Parameter (`PARAMS`) sind Daten und bleiben unuebersetzt.
 - Aktionen in Werkzeugleisten als Icon-Button mit Tooltip und `aria-label` umsetzen,
-  nicht als Textbutton; Text bleibt der Tooltip.
+  nicht als Textbutton (`app/ui/widgets.py::action_button`); Text bleibt der Tooltip.
+  Ausnahmen sind Formular-Abschluesse wie "Anmelden".
 - API-Keys liegen ausschliesslich verschluesselt in `profile.api_key_enc` und nie in
   Logs, Fehlermeldungen, Sessions oder im Browser.
 - Berechtigungen werden serverseitig je Aktion geprueft; UI-Ausblendungen ersetzen das nicht.

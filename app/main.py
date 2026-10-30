@@ -28,6 +28,7 @@ from app.db import (
     run_migrations,
     session_scope,
 )
+from app.i18n import t
 from app.models import AppUser, Role
 from app.schema import SchemaCache
 from app.scripts.runner import ScriptRunner
@@ -35,7 +36,8 @@ from app.settings import get_settings
 from app.ui.admin import register_admin_pages
 from app.ui.guard import current_user, logout
 from app.ui.scripts import register_script_pages
-from app.ui.shell import apply_palette
+from app.ui.shell import apply_locale, apply_palette
+from app.ui.widgets import action_button
 from app.ui.workspaces import register_workspace_pages
 
 logger = logging.getLogger(__name__)
@@ -51,14 +53,14 @@ def _login_view(
     def submit() -> None:
         key = normalize_username(username.value or "")
         if throttle.is_blocked(key):
-            message.set_text("Zu viele Fehlversuche. Bitte spaeter erneut versuchen.")
+            message.set_text(t("Zu viele Fehlversuche. Bitte später erneut versuchen."))
             return
         with session_scope(session_factory) as session:
             try:
                 user = authenticate(session, key, password.value or "")
             except AuthenticationError:
                 throttle.register_failure(key)
-                message.set_text("Anmeldung fehlgeschlagen.")
+                message.set_text(t("Anmeldung fehlgeschlagen."))
                 return
             app.storage.user.update(session_payload(user, timeout))
         throttle.register_success(key)
@@ -66,14 +68,14 @@ def _login_view(
 
     with ui.card().classes("absolute-center w-80 gap-2"):
         ui.label(APP_TITLE).classes("text-lg font-semibold")
-        username = ui.input("Benutzername").props("outlined dense autofocus").classes("w-full")
+        username = ui.input(t("Benutzername")).props("outlined dense autofocus").classes("w-full")
         password = (
             ui.input("Passwort", password=True, password_toggle_button=True)
             .props("outlined dense")
             .classes("w-full")
         )
         message = ui.label().classes("text-negative text-sm")
-        ui.button("Anmelden", on_click=submit).props("unelevated").classes("w-full")
+        ui.button(t("Anmelden"), on_click=submit).props("unelevated").classes("w-full")
         password.on("keydown.enter", lambda _: submit())
 
 
@@ -81,34 +83,22 @@ def _home_view(user: AppUser, timeout: timedelta) -> None:
     apply_palette()
     with ui.column().classes("absolute-center items-center gap-2"):
         ui.label(APP_TITLE).classes("text-2xl font-semibold")
-        ui.label(f"Angemeldet als {user.username} ({user.role.value})")
-        if user.role is Role.SUPERUSER:
-            with ui.row().classes("gap-2"):
-                ui.button("Arbeitsbestaende", on_click=lambda: ui.navigate.to("/workspaces")).props(
-                    "outline dense"
-                )
-                ui.button("Scripts", on_click=lambda: ui.navigate.to("/scripts")).props(
-                    "outline dense"
-                )
-                ui.button("Profile", on_click=lambda: ui.navigate.to("/admin/profiles")).props(
-                    "outline dense"
-                )
-                ui.button("Benutzer", on_click=lambda: ui.navigate.to("/admin/users")).props(
-                    "outline dense"
-                )
-        else:
-            ui.button("Arbeitsbestaende", on_click=lambda: ui.navigate.to("/workspaces")).props(
-                "outline dense"
+        ui.label(t("Angemeldet als {user} ({role})", user=user.username, role=user.role.value))
+        with ui.row().classes("items-center gap-1"):
+            action_button("grid_on", t("Arbeitsbestände"), lambda: ui.navigate.to("/workspaces"))
+            if user.can_edit_scripts or user.role is Role.SUPERUSER:
+                action_button("code", t("Scripts"), lambda: ui.navigate.to("/scripts"))
+            if user.role is Role.SUPERUSER:
+                action_button("badge", t("Profile"), lambda: ui.navigate.to("/admin/profiles"))
+                action_button("group", t("Benutzer"), lambda: ui.navigate.to("/admin/users"))
+        ui.label(t("Review und Schreiben folgen in den nächsten Meilensteinen.")).classes("text-sm")
+        ui.label(
+            t(
+                "Sitzung läuft nach {minutes} Minuten ab.",
+                minutes=f"{timeout.total_seconds() // 60:.0f}",
             )
-            if user.can_edit_scripts:
-                ui.button("Scripts", on_click=lambda: ui.navigate.to("/scripts")).props(
-                    "outline dense"
-                )
-        ui.label("Review und Schreiben folgen in den naechsten Meilensteinen.").classes("text-sm")
-        ui.label(f"Sitzung laeuft nach {timeout.total_seconds() // 60:.0f} Minuten ab.").classes(
-            "text-xs"
-        )
-        ui.button("Abmelden", on_click=logout).props("flat")
+        ).classes("text-xs")
+        action_button("logout", t("Abmelden"), logout)
 
 
 def main() -> None:
@@ -130,6 +120,7 @@ def main() -> None:
     @ui.page("/")
     def index() -> None:
         apply_palette()
+        apply_locale()
         user = current_user(session_factory)
         if user is None:
             _login_view(session_factory, throttle, timeout)

@@ -148,29 +148,41 @@ Metadatenfilter (`metadata_text`, `metadata_selection`, `metadata_date`,
 `has_metadata_field`) akzeptieren eine Feld-ID oder einen Feldnamen; die Fassade loest
 Namen vor dem Senden auf.
 
-## Arbeitsbestaende und Grid
+## Arbeitsbestände und Grid
 
-`/workspaces` laedt die Assets eines veroeffentlichten Scripts (Parameterformular aus
+`/workspaces` lädt die Assets eines veröffentlichten Scripts (Parameterformular aus
 `PARAMS`) in einen Arbeitsbestand: Snapshot der geladenen Werte plus ChangeSet der
-Aenderungen, beides in der Anwendungsdatenbank. `/workspaces/{id}` zeigt das Grid.
+Änderungen, beides in der Anwendungsdatenbank. `/workspaces/{id}` zeigt das Grid.
 
 - Spalten kommen aus `COLUMNS` des Scripts (`std:subject`, `custom:Kampagne`,
   `standard:DateSent`); ohne `COLUMNS` erscheinen Dateiname, Titel, Beschreibung und bis
-  zu zwoelf Custom-Felder.
+  zu zwölf Custom-Felder.
 - Editoren je Typ: Text, Zahl, Datum (`JJJJ-MM-TT HH:MM:SS`), Wahrheitswert,
   Auswahlliste; `map`/`focalpoint`/`orientation` und `std:fileName` sind nur lesbar.
-- Texte werden exakt gespeichert (kein Trimmen). Geaenderte Zellen sind gruen markiert,
+- Texte werden exakt gespeichert (kein Trimmen). Geänderte Zellen sind grün markiert,
   betroffene Zeilen tragen eine Markierung am linken Rand.
-- Toolbar: Wertfilter auf einer Spalte, `nur geaenderte Zeilen`, Sortierung auf- und
-  absteigend, Spalten an Inhalt/Anzeige anpassen, Massenwert fuer markierte/gefilterte/
-  alle Zeilen, Aenderungen verwerfen, Arbeitsbestand schliessen.
+- Toolbar: Wertfilter auf einer Spalte, „nur geänderte Zeilen", Sortierung auf- und
+  absteigend, Spalten an Inhalt/Anzeige anpassen, Massenwert für markierte/gefilterte/
+  alle Zeilen, Änderungen verwerfen, Arbeitsbestand schließen.
 - `GET /workspace/rows` liefert den effektiven Stand (ChangeSet vor Snapshot) mit
-  Trefferzahl und Revision; `GET /workspace/changes` die geaenderten Zellen je Asset.
-- Jede Aenderung erhoeht `edit_revision`. Sieht ein Tab eine neuere Revision, erscheint
-  der Hinweis "in einem anderen Tab geaendert"; Schreibversuche mit veralteter Revision
+  Trefferzahl und Revision; `GET /workspace/changes` die geänderten Zellen je Asset.
+- Jede Änderung erhöht `edit_revision`. Sieht ein Tab eine neuere Revision, erscheint
+  der Hinweis „in einem anderen Tab geändert"; Schreibversuche mit veralteter Revision
   werden abgelehnt.
-- Entwuerfe laufen nach 30 Tagen Inaktivitaet ab; ab sieben Resttagen warnt die Liste.
-  Schliessen entfernt den Arbeitsbestand aus der Liste, Loeschen entfernt ihn ganz.
+- Entwürfe laufen nach 30 Tagen Inaktivität ab; ab sieben Resttagen warnt die Liste.
+  Schließen entfernt den Arbeitsbestand aus der Liste, Löschen entfernt ihn ganz.
+
+## Oberfläche und Sprache
+
+Die Oberfläche ist zweisprachig (Deutsch und Englisch). Deutsch ist die Quelle: alle
+sichtbaren Texte stehen im Code, englische Übersetzungen in `app/i18n.py`. Gewechselt
+wird die Sprache in der Kopfzeile über `DE`/`EN`; sie gilt für die Sitzung.
+
+- Aktionen sind Icon-Buttons mit Tooltip (z. B. Download-Symbol für „Arbeitsbestand
+  laden"), damit weitere Funktionen die Werkzeugleiste nicht sprengen.
+- Texte enthalten echte Umlaute und werden nie automatisch getrimmt.
+- Script-Parameter (`PARAMS`) und Metadatenwerte sind Daten und bleiben unübersetzt.
+- `tests/test_i18n.py` prüft, dass jeder verwendete Text eine englische Übersetzung hat.
 
 ## Phase-1-Spike (nur lesend)
 
