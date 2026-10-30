@@ -19,6 +19,7 @@ from app.models.scripts import QueryScript, QueryScriptVersion
 from app.models.users import AppUser, Profile, UserProfile
 from app.models.workspace import Workspace, WorkspaceAsset, WorkspaceChange
 from app.models.write_plan import WritePlan, WritePlanStep
+from app.models.xlsx import XlsxExport
 
 __all__ = [
     "NAMING_CONVENTION",
@@ -45,5 +46,6 @@ __all__ = [
     "WorkspaceStatus",
     "WritePlan",
     "WritePlanStep",
+    "XlsxExport",
     "utc_now",
 ]

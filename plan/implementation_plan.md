@@ -570,8 +570,7 @@ Installation, Update und Wiederherstellung sind nachvollziehbar getestet; das Sy
 ist ueber HTTPS erreichbar.
 
 **Umgesetzt (30.10.2026):** Farben bleiben zentral in `app/colors.py` und entsprechen der
-Tabelle. Fuer Text und gefuellte Schaltflaechen gibt es kontraststarke Varianten
-(`text_success #15803d`, `text_warning #b45309`, `text_error #b91c1c`, `text_info #0369a1`,
+Tabelle. Fuer Text und gefuellte Schaltflaechen gibt es kontraststarke Varianten(`text_success #15803d`, `text_warning #b45309`, `text_error #b91c1c`, `text_info #0369a1`,
 `action #15803d`, gedämpft `text_muted #475569`), weil die Flaechenfarben als Text nur
 2.1–2.9:1 erreichen; `TEXT_STYLE`/`text_style` setzen sie, `FOCUS_CSS` liefert einen
 sichtbaren Fokusrahmen. Status wird zusaetzlich immer als Text gezeigt. Tests:
@@ -598,6 +597,13 @@ Volume-Ersetzung. Geprueft: Sicherung aus laufendem Container, `--check` meldet
 14 Tabellen und Schema-Version 0002, Wiederherstellung in eine leere Umgebung
 (neues Volume, neuer Container) inklusive Anmeldung mit dem gesicherten Benutzer.
 
+**Betriebsnachweis (30.10.2026):** Image in die Forgejo-Registry gepusht, `deploy-vps.sh`
+auf dem VPS ausgefuehrt, erster Superuser angelegt, erster `backup.sh`-Lauf erfolgreich.
+Von aussen geprueft: `https://bulkedit.vcs1.him-tools.de/health` liefert
+`{"status":"ok","version":"0.1.0"}`, die Anmeldeseite antwortet mit 200, `http://` leitet
+mit 302 auf `https://` um, das Zertifikat ist von Let's Encrypt (`CN=bulkedit.vcs1.him-tools.de`,
+gueltig bis 28.01.2027).
+
 ## 12. Produktivfreigabe
 
 Freigabe erst nach:
@@ -614,6 +620,24 @@ Freigabe erst nach:
 
 Die Umsetzung fuehrt Unit-, Integrations-, UI- und Wiederanlauftests ein. Lasttests
 veraendern keine grossen Produktivbestaende.
+
+**Stand (30.10.2026):**
+
+| Kriterium | Stand | Nachweis |
+|---|---|---|
+| Schreibtests auf eigenen Test-Assets | erfuellt | Laeufe 7, 8, 10, 11, 12, 13, 15 (Ruecklesung je 1/1 bis 3/3) |
+| Neustart-, Timeout-, Teilfehler | erfuellt | Lauf 12 (Timeout ueber Ruecklesung aufgeloest), 13/14 (`reconcile`), Tests in `test_writer.py` |
+| Konfliktwarnung + Bestaetigung | erfuellt | Lauf 8 (blockiert ohne, erfolgreich mit Bestaetigung) |
+| Undo | erfuellt | Laeufe 11, 15; Ablehnung bei externer Aenderung (Lauf 10 vor Reset) |
+| Backup/Restore | teilweise | Restore in leerer Umgebung lokal geprueft; auf dem VPS bisher nur `backup.sh` gelaufen |
+| Feldtypen inklusive Leeren | teilweise | Text, Auswahl (Dateistatus) und Loeschen live; Keywords, Datum, Zahl, Mehrfachauswahl bisher nur per Test |
+| Rollen- und Profiltests | teilweise | Rollen offline geprueft und betrachter angelegt; Live-Test auf dem VPS offen |
+| Last- und Reaktionsziele | offen | Phase-1-Nachweise auf synthetischen Daten; Messung auf dem VPS offen |
+| Doku und DOX | erfuellt | nach jeder Phase aktualisiert (AGENTS.md, README, Plan) |
+
+Vor der Freigabe bleiben damit: Restore auf dem VPS durchspielen, die uebrigen Feldtypen
+einmal live schreiben (Keywords, Datum, Zahl, Mehrfachauswahl), Rollen live pruefen und
+die Lastziele auf dem Zielsystem messen.
 
 ## 13. Folgemeilenstein - Excel
 
@@ -633,6 +657,30 @@ veraendern keine grossen Produktivbestaende.
 - Feldbezogene Importfehler verstaendlich ausweisen.
 
 Import ohne Snapshot und Fehlerdatei-Download folgen erst danach.
+
+**Stand (30.10.2026): umgesetzt.**
+
+| Punkt | Umsetzung |
+|---|---|
+| Format `bulkedit-xlsx/1` | Blätter `Daten`, `Felder`, `Auswahlwerte`, `Info`; Schluessel in Zeile 1, Anzeigenamen in Zeile 2, Daten ab Zeile 3, `file_id` in Spalte A, `export_id` im Blatt `Info` |
+| File-ID und technischer Key | Spalte A ausschliesslich `file_id`; alle weiteren Spalten ueber `std:*`/`custom:<id>`/`standard:<id>`; Informationsspalten mit `@` |
+| Gleicher Stand in Datei und Snapshot | `xlsx_export` (Revision `0003`) speichert Spalten, Wertsnapshot und gekuerzte Zellen; der Export liest nur den Snapshot |
+| Keine ungeschriebenen Aenderungen | Export vermerkt offene Aenderungen (`pending_changes`, `hinweis`) und die Oberflaeche warnt; mitgeschrieben wird nichts |
+| Drei-Wege-Abgleich | `xlsx.diff_rows`: Aenderung, bereits erledigt, Konflikt (uebersprungen und gemeldet), Leeren |
+| Import erzeugt nur Vorschlaege | `xlsx.import_workbook` legt einen Arbeitsbestand mit ChangeSet an; geschrieben wird ueber Review, Dry Run und `execute` |
+| Bestehende Pipeline | Laeufe tragen `run.source = xlsx` und `run.xlsx_export_id` (Nachweis: Laeufe 16 und 17) |
+| Limits | 20 MB, entpackt 200 MB, Zeilenlimit des Profils, 32 767 Zeichen je Zelle, nur `.xlsx` |
+| Keine Formeln/Makros | `vbaProject` wird abgelehnt, Formelzellen als Befund gemeldet |
+| Formel-Injection | Textzellen werden mit `data_type = "s"` geschrieben und bleiben Text |
+| ZIP-Schutz | Pruefung von Signatur und entpackter Groesse vor dem Lesen |
+| Feldbezogene Fehler | `CellIssue` mit „Zeile · Spalte · Meldung" in Oberflaeche und Import-Ergebnis |
+| Import ohne Snapshot | Zwei-Wege-Vergleich mit ausdruecklicher Bestaetigung; leere Zellen bleiben unberuecksichtigt |
+
+Live-Nachweis: Export aus einem Arbeitsbestand, Aenderung von `std:subject` in der Datei,
+Import mit genau einer Aenderung, Review ohne Fehler, Dry Run (Lauf 16) und Schreiben
+(Lauf 17) mit Ruecklesung `ok`; ein zu alter Snapshot wurde korrekt als Konflikt gemeldet.
+
+Noch offen: Download einer Fehlerdatei mit Markierung der abgelehnten Zellen.
 
 ## 14. Abhaengigkeiten und Reihenfolge
 

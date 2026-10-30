@@ -158,12 +158,15 @@ def command_create_profile(args: argparse.Namespace) -> int:
 
 def command_purge_history(args: argparse.Namespace) -> int:
     from app.runs import purge_change_values
+    from app.xlsx import purge_exports
 
     settings = _require_settings()
     factory = _open_session_factory(settings)
     with session_scope(factory) as session:
         removed = purge_change_values(session, days=args.days)
+        exports = purge_exports(session)
     print(f"{removed} Feldwerte aus Laeufen aelter als {args.days} Tage entfernt.")
+    print(f"{exports} Export-Snapshots aelter als die Aufbewahrungsfrist entfernt.")
     return 0
 
 

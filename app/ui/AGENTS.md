@@ -23,9 +23,11 @@
   und `/scripts/{script_id}` (Editor mit `ui.codemirror`, Parameterformular aus `PARAMS`,
   Pruefen, Dry Run, Speichern, Veroeffentlichen; `script_id = 0` legt neu an).
 - `workspaces.py`: `register_workspace_pages` registriert `/workspaces` (Laden aus einem
-  veroeffentlichten Script, Liste offener Entwuerfe) und `/workspaces/{id}` (AG Grid mit
-  Infinite Row Model). Daten liefern `GET /workspace/rows` (effektiver Stand, Filter,
-  Sortierung, `onlyChanged`) und `GET /workspace/changes` (geaenderte Zellen je Asset).
+  veroeffentlichten Script, Excel-Import, Liste offener Entwuerfe) und `/workspaces/{id}`
+  (AG Grid mit Infinite Row Model). Daten liefern `GET /workspace/rows` (effektiver Stand,
+  Filter, Sortierung, `onlyChanged`) und `GET /workspace/changes` (geaenderte Zellen je
+  Asset). Die Werkzeugleiste enthaelt den Excel-Export der markierten oder gefilterten
+  Zeilen.
 - `review.py`: `register_review_pages` registriert `/workspaces/{id}/review`: Liste aller
   Feldänderungen, Fehler/Hinweise (inklusive externer Aenderungen), `Dry Run prüfen`,
   `Jetzt schreiben` und Rueckweg ins Grid.
@@ -81,6 +83,15 @@
 - `Status abgleichen` erscheint bei Live-Laeufen, die nicht `ok` sind, und ruft
   `app/writer.reconcile` auf: Ruecklesung statt erneutem Senden, danach Neuladen der Seite.
   Ein Undo eines Statuswechsels verlangt in der Review-Seite ebenfalls einen Kommentar.
+- Der Excel-Export laeuft ueber `app/xlsx.export_workbook` in `run.io_bound` mit eigener
+  Session und startet den Download mit `ui.download(bytes, dateiname)`; ungeschriebene
+  Aenderungen werden nur gemeldet, nie mitgeschrieben.
+- Der Excel-Import ist ein Dialog auf `/workspaces`: Profil waehlen, Datei hochladen
+  (`ui.upload`, `.xlsx`, `MAX_FILE_BYTES`), Zusammenfassung und Zellbefunde anzeigen,
+  dann importieren. Ohne Export-Snapshot bleibt `Importieren` gesperrt, bis die Checkbox
+  "Ohne Exportbasis importieren" bestaetigt wurde. Nach Erfolg fuehrt ein Button in den
+  neuen Arbeitsbestand (Review). Nur Editor und Superuser duerfen importieren, das Profil
+  muss `allow_write` haben.
 
 ## Work Guidance
 
@@ -105,6 +116,9 @@
 - `/workspaces/{id}/review`: Dry Run ausfuehren (Protokolleintrag mit Status `ok`), dann
   "Jetzt schreiben"; nach Erfolg steht die Aenderungszahl auf 0 und die Werte sind im Grid
   sichtbar. Mit einer extern geaenderten Datei muss der Lauf ohne Bestaetigung blockieren.
+- Excel: im Grid exportieren, in der Arbeitsmappe eine Zelle aendern, ueber `/workspaces`
+  importieren; der neue Arbeitsbestand zeigt genau diese Aenderung, und die Review-Seite
+  schreibt sie mit `run.source = xlsx`.
 
 ## Child DOX Index
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 # backup.sh - konsistente Sicherung von Datenbank und Zustand des Bulk-Editors
 #
-#   ./backup.sh                       # sichert nach ./backups
-#   ./backup.sh /pfad/ausserhalb/vps  # anderes Zielverzeichnis
+#   bash backup.sh                       # sichert nach ./backups
+#   bash backup.sh /pfad/ausserhalb/vps  # anderes Zielverzeichnis
 #
 # Gesichert werden:
 #   - die SQLite-Datenbank als konsistente Kopie ueber die SQLite-Backup-API im
@@ -75,5 +75,5 @@ chmod 600 "$ARCHIVE"
 
 echo -e "${GREEN}Sicherung erstellt: $ARCHIVE${NC}"
 echo -e "${BLUE}Groesse: $(du -h "$ARCHIVE" | cut -f1)${NC}"
-echo -e "${YELLOW}Pruefen mit: ./restore.sh --check $ARCHIVE${NC}"
+echo -e "${YELLOW}Pruefen mit: bash restore.sh --check $ARCHIVE${NC}"
 echo -e "${YELLOW}BULKEDIT_MASTER_KEY und BULKEDIT_STORAGE_SECRET aus .env getrennt sichern.${NC}"

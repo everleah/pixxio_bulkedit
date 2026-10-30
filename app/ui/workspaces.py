@@ -56,6 +56,15 @@ from app.workspaces import (
     set_change,
     store_snapshot,
 )
+from app.xlsx import (
+    MAX_FILE_BYTES,
+    XlsxError,
+    document_summary,
+    export_workbook,
+    has_snapshot,
+    import_workbook,
+    parse_workbook,
+)
 
 ROWS_ROUTE = "/workspace/rows"
 CHANGES_ROUTE = "/workspace/changes"
@@ -269,6 +278,17 @@ def script_column_keys(session: Any, workspace: Workspace) -> list[str] | None:
     return columns
 
 
+def script_label(session: Any, workspace: Workspace) -> str:
+    """Name des Scripts zu einem Arbeitsbestand (für Dateinamen und Export-Info)."""
+    if workspace.script_version_id is None:
+        return ""
+    version = session.get(QueryScriptVersion, workspace.script_version_id)
+    if version is None:
+        return ""
+    script = session.get(QueryScript, version.script_id)
+    return script.name if script is not None else ""
+
+
 def _profiles_for(session_factory: SessionFactory, user: AppUser) -> dict[int, str]:
     with session_scope(session_factory) as session:
         account = session.get(AppUser, user.id)
@@ -381,6 +401,7 @@ def register_workspace_pages(
             )
             name_input = ui.input(t("Name (optional)")).props("outlined dense").classes("w-56")
             load_button = action_button("download", t("Arbeitsbestand laden"))
+            import_button = action_button("upload_file", t("Excel importieren"))
         params_container = ui.column().classes("w-full gap-2")
         param_widgets: dict[str, Any] = {}
 
@@ -508,6 +529,189 @@ def register_workspace_pages(
             ui.navigate.to(f"/workspaces/{workspace_id}")
 
         load_button.on_click(load_workspace)
+
+        import_state: dict[str, Any] = {"data": b"", "name": "", "workspace": None}
+
+        with ui.dialog() as import_dialog, ui.card().classes("w-[680px] gap-2"):
+            ui.label(t("Excel-Import")).classes("font-semibold text-base")
+            ui.label(
+                t(
+                    "Die Arbeitsmappe stammt aus dem Excel-Export des Bulk-Editors. "
+                    "Übernommen werden nur Zellen, die sich gegenüber dem Export geändert haben."
+                )
+            ).classes("text-xs")
+            import_profile = (
+                ui.select(profiles, label=t("Profil"), value=next(iter(profiles), None))
+                .props("outlined dense")
+                .classes("w-64")
+            )
+            import_upload = (
+                ui.upload(
+                    label=t("Arbeitsmappe (.xlsx)"),
+                    auto_upload=True,
+                    max_file_size=MAX_FILE_BYTES,
+                )
+                .props('accept=".xlsx"')
+                .classes("w-full")
+            )
+            import_summary = ui.column().classes("w-full gap-1 text-sm")
+            import_issues = ui.column().classes("w-full gap-0 text-xs")
+            import_confirm = ui.checkbox(
+                t("Ohne Exportbasis importieren (nur Zwei-Wege-Vergleich)")
+            )
+            import_confirm.set_visibility(False)
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button(t("Abbrechen"), on_click=import_dialog.close).props("flat")
+                import_open = ui.button(
+                    t("Zum Arbeitsbestand"),
+                    on_click=lambda: ui.navigate.to(f"/workspaces/{import_state['workspace']}"),
+                )
+                import_open.set_visibility(False)
+                import_start = ui.button(t("Importieren")).props("unelevated")
+            import_start.disable()
+
+        def _reset_import() -> None:
+            import_summary.clear()
+            import_issues.clear()
+            import_confirm.set_visibility(False)
+            import_confirm.value = False
+            import_open.set_visibility(False)
+            import_start.disable()
+            import_state.update({"data": b"", "name": "", "workspace": None})
+
+        async def uploaded(event: Any) -> None:
+            _reset_import()
+            data = await event.file.read()
+            name = str(getattr(event.file, "name", "") or "")
+            profile_id = import_profile.value
+            if not name.lower().endswith(".xlsx"):
+                with import_summary:
+                    ui.label(t("Nur .xlsx-Dateien werden unterstützt.")).style(TEXT_STYLE["error"])
+                return
+            if not isinstance(profile_id, int):
+                with import_summary:
+                    ui.label(t("Bitte ein Profil auswählen.")).style(TEXT_STYLE["warning"])
+                return
+
+            def parse() -> tuple[Any, bool]:
+                with session_scope(session_factory) as session:
+                    profile_row = session.get(Profile, profile_id)
+                    if profile_row is None:
+                        raise WorkspaceError(t("Das Profil fehlt."))
+                    schema = schema_cache.get(profile_row)
+                    parsed = parse_workbook(data, schema.columns(), max_rows=profile_row.max_rows)
+                    return parsed, has_snapshot(session, parsed)
+
+            try:
+                outcome = await run.io_bound(parse)
+            except (XlsxError, ScriptError, WorkspaceError) as exc:
+                with import_summary:
+                    ui.label(describe_error(exc)).style(TEXT_STYLE["error"])
+                return
+            if outcome is None:
+                return
+            parsed, snapshot = outcome
+            import_state.update({"data": data, "name": name})
+            with import_summary:
+                for line in document_summary(parsed):
+                    ui.label(line).classes("text-xs")
+                if not snapshot:
+                    ui.label(
+                        t(
+                            "Keine Exportbasis gefunden: externe Änderungen können nicht "
+                            "erkannt werden, leere Zellen bleiben unberücksichtigt."
+                        )
+                    ).style(TEXT_STYLE["warning"])
+            if parsed.issues:
+                with import_issues:
+                    ui.label(t("{count} Befunde:", count=len(parsed.issues))).classes(
+                        "font-semibold"
+                    )
+                    for issue in parsed.issues[:50]:
+                        ui.label(issue.as_text())
+            if snapshot:
+                import_start.enable()
+            else:
+                import_confirm.set_visibility(True)
+
+        def confirm_changed() -> None:
+            if import_confirm.value and import_state["data"]:
+                import_start.enable()
+            else:
+                import_start.disable()
+
+        async def start_import_now() -> None:
+            data = import_state["data"]
+            profile_id = import_profile.value
+            if not data or not isinstance(profile_id, int):
+                ui.notify(t("Bitte Profil und Datei auswählen."), color="warning")
+                return
+            if user.role is Role.VIEWER:
+                ui.notify(
+                    t("Nur Editor- und Superuser-Rollen dürfen importieren."), color="negative"
+                )
+                return
+
+            def job() -> Any:
+                with session_scope(session_factory) as session:
+                    actor = session.get(AppUser, user.id)
+                    profile_row = session.get(Profile, profile_id)
+                    if actor is None or profile_row is None:
+                        raise WorkspaceError(t("Benutzer oder Profil fehlt."))
+                    if not profile_row.allow_write:
+                        raise WorkspaceError(
+                            t("Das Profil ist nur lesbar; ein Import ist nicht möglich.")
+                        )
+                    client = client_factory.client_for(profile_row)
+                    schema = schema_cache.get(profile_row)
+                    return import_workbook(
+                        session,
+                        owner=actor,
+                        profile=profile_row,
+                        schema=schema,
+                        client=client,
+                        data=data,
+                        filename=import_state["name"],
+                    )
+
+            try:
+                imported = await run.io_bound(job)
+            except (XlsxError, ScriptError, WorkspaceError) as exc:
+                ui.notify(describe_error(exc), color="negative")
+                return
+            if imported is None:
+                return
+            import_summary.clear()
+            import_open.set_visibility(False)
+            import_start.disable()
+            import_confirm.set_visibility(False)
+            with import_summary:
+                if imported.workspace_id is None:
+                    ui.label(t("Die Arbeitsmappe enthält keine wirksamen Änderungen.")).style(
+                        TEXT_STYLE["warning"]
+                    )
+                else:
+                    ui.label(
+                        t(
+                            "{changed} Änderungen aus {rows} Zeilen übernommen.",
+                            changed=imported.changed,
+                            rows=imported.row_count,
+                        )
+                    ).style(TEXT_STYLE["success"])
+                    if not imported.three_way:
+                        ui.label(t("Ohne Exportbasis geprüft (Zwei-Wege-Vergleich).")).style(
+                            TEXT_STYLE["warning"]
+                        )
+                    for warning in imported.warnings:
+                        ui.label(warning)
+            import_state["workspace"] = imported.workspace_id
+            if imported.workspace_id is not None:
+                import_open.set_visibility(True)
+
+        import_button.on_click(import_dialog.open)
+        import_upload.on_upload(uploaded)
+        import_confirm.on_value_change(lambda _: confirm_changed())
+        import_start.on_click(start_import_now)
 
         def _remove(workspace_id: int) -> None:
             with session_scope(session_factory) as session:
@@ -864,6 +1068,47 @@ def register_workspace_pages(
                     close_workspace(session, current)
             ui.navigate.to(LIST_ROUTE)
 
+        async def export_excel() -> None:
+            file_ids = selected_file_ids(await grid.get_selected_rows())
+            apply_filter()
+            if not file_ids and (state["filter"] or state["onlyChanged"]):
+                file_ids = targets_for("filtered", [])
+
+            def job() -> Any:
+                with session_scope(session_factory) as session:
+                    current = session.get(Workspace, workspace_id)
+                    actor = session.get(AppUser, user.id)
+                    if current is None or actor is None:
+                        raise WorkspaceError(t("Der Arbeitsbestand wurde nicht gefunden."))
+                    profile_row = session.get(Profile, current.profile_id)
+                    if profile_row is None:
+                        raise WorkspaceError(t("Das Profil fehlt."))
+                    return export_workbook(
+                        session,
+                        workspace=current,
+                        profile=profile_row,
+                        columns=columns,
+                        actor=actor,
+                        script_label=script_label(session, current),
+                        file_ids=file_ids or None,
+                    )
+
+            try:
+                exported = await run.io_bound(job)
+            except XlsxError as exc:
+                ui.notify(describe_error(exc), color="negative")
+                return
+            if exported is None:
+                return
+            ui.download(exported.data, exported.filename)
+            if exported.pending_changes:
+                ui.notify(
+                    t("Export erstellt: ungeschriebene Änderungen sind nicht enthalten."),
+                    color="warning",
+                )
+            else:
+                ui.notify(t("Export erstellt: {rows} Zeilen.", rows=exported.row_count))
+
         with ui.row().classes("w-full items-center gap-1 mt-1"):
             action_button("filter_alt_off", t("Filter zurücksetzen"), reset_filter)
             action_button("arrow_upward", t("Aufsteigend sortieren"), lambda: sort_by("asc"))
@@ -872,6 +1117,9 @@ def register_workspace_pages(
             action_button("open_in_full", t("Spalten an Anzeige anpassen"), fit_display)
             action_button("edit_note", t("Wert auf Ziel setzen"), apply_value)
             action_button("undo", t("Änderungen verwerfen"), revert_selection)
+            action_button(
+                "table_view", t("Excel-Export (markierte oder gefilterte Zeilen)"), export_excel
+            )
             action_button(
                 "fact_check",
                 t("Review und schreiben"),

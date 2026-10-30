@@ -40,6 +40,9 @@ class Run(Base):
     write_plan_id: Mapped[int | None] = mapped_column(
         ForeignKey("write_plan.id", ondelete="SET NULL"), default=None
     )
+    xlsx_export_id: Mapped[str | None] = mapped_column(
+        ForeignKey("xlsx_export.id", ondelete="SET NULL"), default=None
+    )
     params_json: Mapped[str | None] = mapped_column(Text, default=None)
     plan_json: Mapped[str | None] = mapped_column(Text, default=None)
     stats_json: Mapped[str | None] = mapped_column(Text, default=None)

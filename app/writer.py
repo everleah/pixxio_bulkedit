@@ -47,7 +47,7 @@ from app.models.enums import (
 )
 from app.normalize import display_value, values_equal
 from app.schema import ColumnDef, ProfileSchema
-from app.workspaces import WorkspaceError, commit_applied, file_values
+from app.workspaces import WorkspaceError, commit_applied, file_values, import_meta
 from app.writeplan import (
     PlannedChange,
     PlanPreview,
@@ -238,16 +238,19 @@ def _run_row(
     mode: RunMode,
     actor: AppUser | None,
 ) -> Run:
+    meta = import_meta(workspace)
+    source = RunSource.XLSX if meta is not None else RunSource.GRID
     run = Run(
         kind=RunKind.WRITE,
         mode=mode,
-        source=RunSource.GRID,
+        source=source,
         status=RunStatus.RUNNING,
         user_id=actor.id if actor is not None else None,
         profile_id=workspace.profile_id,
         script_version_id=workspace.script_version_id,
         workspace_id=workspace.id,
         write_plan_id=plan.id,
+        xlsx_export_id=(meta or {}).get("export_id") or None,
         plan_json=plan.plan_json,
     )
     session.add(run)

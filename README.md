@@ -215,6 +215,38 @@ Status und Fehlertext.
   betroffenen Dateien zurück und entscheidet neu — bestätigte Werte gelten als Erfolg und
   werden aus dem Entwurf gebucht, unklare bleiben unklar. Es wird nie erneut gesendet.
 
+## Excel-Export und -Import
+
+Der Weg über Excel nutzt dasselbe Sicherheitsnetz wie das Grid: exportieren, in Excel
+bearbeiten, importieren, prüfen (Review/Dry Run) und erst dann schreiben.
+
+- **Export** in der Werkzeugleiste des Grids (Icon „Excel-Export"): exportiert die
+  markierten Zeilen, sonst die gefilterten Zeilen, sonst den ganzen Arbeitsbestand.
+  Grundlage ist immer der gespeicherte Snapshot — ungeschriebene Grid-Änderungen werden
+  nie mitgeschrieben, sondern nur im Blatt `Info` vermerkt.
+- Die Arbeitsmappe hat vier Blätter: `Daten` (Zeile 1 technische Schlüssel, Zeile 2
+  Anzeigenamen mit AutoFilter, Daten ab Zeile 3, `file_id` in Spalte A), `Felder`
+  (Legende je Spalte), `Auswahlwerte` (Quelle der Auswahllisten) und `Info`
+  (Format, Version, `export_id`, Profil, Host, Zeitpunkt, Anzahl Zeilen).
+- Nur schreibbare Spalten werden importiert. Informationsspalten (`@std:fileName`,
+  `@modifyDate`, Karten/Fokuspunkt/Ausrichtung) tragen ein `@` und bleiben unberücksichtigt.
+  Mehrfachwerte werden mit `;` getrennt; Text mit führendem `=` bleibt Text.
+- **Import** über `/workspaces` (Icon „Excel importieren"): Profil wählen, Datei
+  hochladen, Zusammenfassung und Zellbefunde („Zeile · Spalte · Meldung") prüfen,
+  importieren. Der Import legt einen neuen Arbeitsbestand an und führt direkt in dessen
+  Review.
+- Übernommen werden nur Zellen, die sich gegenüber dem Export geändert haben
+  (Drei-Wege-Abgleich aus Exportbasis, Excel und aktuellem pixx.io-Stand). Bereits
+  erledigte Zellen werden still übersprungen, zwischenzeitlich extern geänderte Zellen
+  gemeldet und nicht überschrieben.
+- Ohne Exportbasis (Snapshot abgelaufen oder fremde Datei) ist nur ein Zwei-Wege-Vergleich
+  möglich: leere Zellen bleiben dann unberücksichtigt, und die Oberfläche verlangt eine
+  ausdrückliche Bestätigung.
+- Grenzen: nur `.xlsx` (keine Makros, keine Formeln), 20 MB Dateigröße, Zeilenlimit des
+  Profils, Zelltexte bis 32 767 Zeichen (längere werden gekürzt und als solche behandelt).
+- Export-Snapshots liegen in `xlsx_export` und werden nach 90 Tagen mit
+  `python -m app purge-history` entfernt. Läufe aus einem Import tragen die Quelle `xlsx`.
+
 ## Oberfläche und Sprache
 
 Die Oberfläche ist zweisprachig (Deutsch und Englisch). Deutsch ist die Quelle: alle
@@ -315,8 +347,8 @@ Auf dem VPS liegen `docker-compose.vps.yml`, `deploy-vps.sh`, `backup.sh`, `rest
 und eine `.env` (Vorlage: `.env.vps.example`) in einem Ordner:
 
 ```bash
-./deploy-vps.sh            # Image ziehen, Container neu starten, Healthcheck abwarten
-./deploy-vps.sh --backup   # zusätzlich vorher sichern (Empfehlung bei Updates)
+bash deploy-vps.sh            # Image ziehen, Container neu starten, Healthcheck abwarten
+bash deploy-vps.sh --backup   # zusätzlich vorher sichern (Empfehlung bei Updates)
 ```
 
 - Traefik übernimmt HTTPS und Routing über das externe Netz `him-net`
@@ -333,7 +365,7 @@ und eine `.env` (Vorlage: `.env.vps.example`) in einem Ordner:
 ### Erster Superuser (Pflicht, kein Standardpasswort)
 
 Die Anwendung bringt bewusst keinen vorgefertigten Benutzer mit: Ohne angelegten
-Superuser kann sich niemand anmelden. Nach dem ersten `./deploy-vps.sh` einmalig im
+Superuser kann sich niemand anmelden. Nach dem ersten `bash deploy-vps.sh` einmalig im
 Container anlegen (Passwort mindestens 12 Zeichen):
 
 ```bash
@@ -363,17 +395,22 @@ Es gibt keinen automatischen Backup-Dienst. Gesichert wird manuell und verschlü
 
 ```bash
 openssl rand -base64 48 > backup.key && chmod 600 backup.key   # einmal, getrennt aufbewahren
-./backup.sh /pfad/ausserhalb-des-vps                            # konsistente Kopie + Verschlüsselung
-./restore.sh --check backups/bulkedit-20261030T120000Z.tar.gz.enc
-./restore.sh backups/bulkedit-20261030T120000Z.tar.gz.enc      # Container stoppen, Daten ersetzen
+bash backup.sh /pfad/ausserhalb-des-vps                        # konsistente Kopie + Verschlüsselung
+bash restore.sh --check                                        # neueste Sicherung prüfen
+bash restore.sh --check backups/bulkedit-20261030T120000Z.tar.gz.enc
+bash restore.sh backups/bulkedit-20261030T120000Z.tar.gz.enc   # Container stoppen, Daten ersetzen
 ```
+
+Ohne Pfadangabe nimmt `restore.sh` die neueste Sicherung aus `./backups` (`BACKUP_DIR`
+überschreibt den Ordner). Die Skripte sind mit `bash …` aufrufbar und brauchen kein
+Ausführungsbit.
 
 - `backup.sh` erzeugt die Datenbankkopie über die SQLite-Backup-API im Container (auch bei
   laufender Anwendung konsistent), prüft `PRAGMA integrity_check` und verschlüsselt das
   Archiv mit OpenSSL (AES-256-CBC, PBKDF2).
 - `BULKEDIT_MASTER_KEY` und `BULKEDIT_STORAGE_SECRET` gehören **nicht** ins Archiv und
   werden getrennt aufbewahrt; ohne Master-Key sind gespeicherte API-Keys unlesbar.
-- Vor migrationspflichtigen Updates sichern (`./deploy-vps.sh --backup`).
+- Vor migrationspflichtigen Updates sichern (`bash deploy-vps.sh --backup`).
 - Wiederherstellung wurde in einer leeren Umgebung getestet: neues Volume, Archiv
   einspielen, Anmeldung mit dem gesicherten Benutzer.
 - Bereits in pixx.io wirksame Änderungen verschwinden durch einen Restore nicht;

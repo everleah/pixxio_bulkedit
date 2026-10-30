@@ -1,8 +1,8 @@
 #!/bin/bash
 # deploy-vps.sh - pixx.io Bulk-Editor auf dem VPS deployen (Forgejo-Registry + Traefik)
 #
-#   ./deploy-vps.sh              # Image ziehen und neu starten
-#   ./deploy-vps.sh --backup     # vorher eine Sicherung erstellen (Empfehlung bei Updates)
+#   bash deploy-vps.sh              # Image ziehen und neu starten
+#   bash deploy-vps.sh --backup     # vorher eine Sicherung erstellen (Empfehlung bei Updates)
 
 set -e
 
@@ -57,7 +57,7 @@ fi
 
 if [ "$1" = "--backup" ]; then
     echo -e "${YELLOW}Sicherung vor dem Update...${NC}"
-    ./backup.sh
+    bash ./backup.sh
 fi
 
 echo -e "${YELLOW}Logging in to Forgejo registry...${NC}"

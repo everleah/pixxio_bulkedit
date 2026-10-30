@@ -47,6 +47,11 @@
 - `test_deployment.py`: Dockerfile, `.dockerignore`, Compose-Datei, `.env.vps.example`,
   LF-Zeilenenden der Shell-Skripte, Inhalt von `backup.sh`/`restore.sh`/`deploy-vps.sh`
   sowie Host/Port-Konfiguration und `/health`-Verdrahtung.
+- `test_xlsx.py`: Excel-Schnittstelle ohne Netzzugriff: Aufbau der Arbeitsmappe (Blaetter,
+  Kopfzeilen, `@`-Infospalten, Auswahlliste, Kuerzung langer Texte), Schutz vor
+  Formeleinschleusung, Export-Snapshot und Aufbewahrungsgrenze, Import mit Drei-Wege-
+  Abgleich (Aenderung, bereits erledigt, Konflikt, Leeren), Zwei-Wege-Rueckfall ohne
+  Snapshot, Format-/Host-/Spaltenpruefungen, Zeilenlimit und `run.source = xlsx`.
 
 ## Local Contracts
 
@@ -59,6 +64,9 @@
 - Schemaaenderungen muessen `test_migrationen_passen_zu_modellen` bestehen.
 - Schreibpfad-Tests ersetzen `pixxio_client.files.File` und `pixxio_client.jobs.Job`
   ueber `monkeypatch.setattr`; echte Schreibaufrufe gehoeren nicht in die Testsuite.
+- Excel-Tests erzeugen Arbeitsmappen im Speicher (`io.BytesIO`) und lesen sie mit
+  `openpyxl` zurueck; der Import liest den aktuellen Stand ueber einen nachgebauten
+  `File`-Client (`FakeFiles`).
 
 ## Work Guidance
 

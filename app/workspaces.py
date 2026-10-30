@@ -191,6 +191,18 @@ def touch(session: Session, workspace: Workspace) -> None:
     session.flush()
 
 
+def import_meta(workspace: Workspace) -> dict[str, Any] | None:
+    """Metadaten eines Excel-Imports, sonst ``None``."""
+    if not workspace.params_json:
+        return None
+    try:
+        params = json.loads(workspace.params_json)
+    except ValueError:
+        return None
+    meta = params.get("xlsx") if isinstance(params, dict) else None
+    return meta if isinstance(meta, dict) else None
+
+
 def list_workspaces(session: Session, owner_id: int) -> Sequence[Workspace]:
     return list(
         session.scalars(

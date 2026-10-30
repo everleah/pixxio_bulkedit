@@ -80,6 +80,10 @@ def test_sicherung_und_wiederherstellung_nutzen_konsistente_mittel() -> None:
     assert "PRAGMA integrity_check" in restore
     assert "--check" in restore
     assert "docker inspect --format '{{.State.Health.Status}}'" in restore
+    # Ohne Pfadangabe wird die neueste Sicherung verwendet
+    assert 'BACKUP_DIR="${BACKUP_DIR:-./backups}"' in restore
+    assert 'ls -1t "$BACKUP_DIR"/*.tar.gz.enc' in restore
+    assert "Verwende neueste Sicherung" in restore
 
 
 def test_deploy_skript_prueft_healthcheck_und_erinnert_an_abgleich() -> None:

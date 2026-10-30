@@ -1,8 +1,9 @@
 #!/bin/bash
 # restore.sh - Sicherung pruefen oder in eine (auch leere) Umgebung zurueckspielen
 #
-#   ./restore.sh --check backups/bulkedit-20261030T120000Z.tar.gz.enc
-#   ./restore.sh backups/bulkedit-...tar.gz.enc            # Container stoppen, Daten ersetzen
+#   bash restore.sh --check                      # neueste Sicherung nur pruefen
+#   bash restore.sh --check backups/datei.tar.gz.enc
+#   bash restore.sh backups/datei.tar.gz.enc     # Container stoppen, Daten ersetzen
 #
 # Der Container bleibt waehrend des Zurueckspielens gestoppt; danach startet er neu und
 # fuehrt ausstehende Migrationen aus. Bereits in pixx.io wirksame Aenderungen kommen
@@ -19,6 +20,7 @@ CONTAINER="${BULKEDIT_CONTAINER:-pixxio-bulkedit-vps}"
 VOLUME="${BULKEDIT_VOLUME:-pixxio_bulkedit_bulkedit_data}"
 KEY_FILE="${BACKUP_KEY_FILE:-./backup.key}"
 IMAGE="${BULKEDIT_IMAGE:-python:3.14-slim}"
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
 MODE="restore"
 ARCHIVE=""
 
@@ -30,8 +32,19 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-if [ -z "$ARCHIVE" ] || [ ! -f "$ARCHIVE" ]; then
-    echo -e "${RED}ERROR: Sicherungsdatei fehlt: ${ARCHIVE:-<leer>}${NC}"
+if [ -z "$ARCHIVE" ]; then
+    ARCHIVE=$(ls -1t "$BACKUP_DIR"/*.tar.gz.enc 2>/dev/null | head -n 1 || true)
+    if [ -z "$ARCHIVE" ]; then
+        echo -e "${RED}ERROR: Keine Sicherung in ${BACKUP_DIR} gefunden.${NC}"
+        echo -e "${YELLOW}Aufruf: bash restore.sh [--check] [datei]${NC}"
+        ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 5
+        exit 1
+    fi
+    echo -e "${YELLOW}Verwende neueste Sicherung: $ARCHIVE${NC}"
+fi
+
+if [ ! -f "$ARCHIVE" ]; then
+    echo -e "${RED}ERROR: Sicherungsdatei nicht gefunden: $ARCHIVE${NC}"
     exit 1
 fi
 

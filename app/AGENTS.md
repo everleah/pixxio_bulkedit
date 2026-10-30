@@ -13,8 +13,8 @@
 - `db.py`: Engine mit SQLite-PRAGMAs (`foreign_keys`, WAL, `busy_timeout`),
   Session-Factory, `session_scope`, Alembic-Lauf.
 - `models/`: `Base` mit Namenskonvention und UTC-Zeitstempeln, Enums sowie Modelle fuer
-  Benutzer, Profile, Scripts, Arbeitsbestand, Snapshot, ChangeSet, WritePlan, Runs und
-  Admin-Audit.
+  Benutzer, Profile, Scripts, Arbeitsbestand, Snapshot, ChangeSet, WritePlan, Runs,
+  Excel-Exporte (`xlsx_export`) und Admin-Audit.
 - `auth.py`: Argon2id-Hashes, Rollen und Rechte, Login-Drosselung, Session-Helfer,
   Schutz des letzten aktiven Superusers.
 - `colors.py`: Meadow-Palette und WCAG-Kontrastberechnung; `TEXT_STYLE`/`text_style`
@@ -39,6 +39,12 @@
 - `runs.py`: Laufuebersicht (`list_runs` mit Zaehlern je Status), Feldhistorie
   (`run_changes`, `undoable_changes`), Undo-Vorbereitung (`prepare_undo`) und
   Aufbewahrungsgrenze (`purge_change_values`, 90 Tage).
+- `xlsx.py`: Excel-Schnittstelle `bulkedit-xlsx/1`. `export_workbook` schreibt den
+  Snapshot des Arbeitsbestands (Blaetter `Daten`, `Felder`, `Auswahlwerte`, `Info`) und
+  legt den Exportstand in `xlsx_export` ab; `parse_workbook`, `diff_rows` und
+  `import_workbook` lesen die Arbeitsmappe, vergleichen Exportbasis, Excel und aktuellen
+  Stand (Drei-Wege) und legen daraus einen neuen Arbeitsbestand mit ChangeSet an.
+  `purge_exports` haelt die Aufbewahrungsfrist ein.
 - `profiles.py`: Profile anlegen und aendern (API-Key verschluesselt, Hint statt Key),
   Verbindungstest protokollieren, Host normalisieren; schreibt `AdminAudit`-Eintraege.
 - `clients.py`: `ClientFactory` haelt je Profil einen pixx.io-Client, ent- und
@@ -55,7 +61,7 @@
 - `scripts/`: Abfrage-Scripts mit Vertrag, RestrictedPython, read-only Fassade `px`,
   Kindprozess-Ausfuehrung, Versionierung und Vorlagen; Details in `scripts/AGENTS.md`.
 - `cli.py` mit `__main__.py`: `init-db`, `generate-master-key`, `create-superuser`,
-  `create-profile`, `serve`.
+  `create-profile`, `purge-history`, `serve`.
 - `spike/`: Machbarkeitspruefungen der Phase 1 gegen ein Testsystem. `settings.py` liest
   `PXTEST_*`, `client.py` haelt die Seitenlimits, `discovery.py` liest Schema und Werte,
   `ledger.py` fuehrt selbst angelegte Test-Assets, `guard.py` setzt die Schutzgrenze,
@@ -105,7 +111,26 @@
 - `purge_change_values` entfernt `old_value`/`new_value` nach
   `HISTORY_RETENTION_DAYS` (90) Tagen; `run`, `file_id`, `field_key` und `status` bleiben
   fuer die Laufuebersicht erhalten. Aufruf ueber `python -m app purge-history` oder die
-  Schaltflaeche in `/runs`.
+  Schaltflaeche in `/runs`. Derselbe Aufruf entfernt Export-Snapshots nach
+  `EXPORT_TTL_DAYS` (90) Tagen ueber `purge_exports`.
+- Excel-Export liest ausschliesslich den Snapshot (`workspace_asset`), nie den effektiven
+  Stand: ungeschriebene Grid-Aenderungen werden nicht exportiert, der Export vermerkt sie
+  nur (`pending_changes`/`hinweis` im Blatt `Info`). Zeile 1 haelt technische Schluessel,
+  Zeile 2 die Anzeigenamen (AutoFilter), Daten ab Zeile 3, Spalte A `file_id`.
+- Nicht schreibbare Spalten (`std:fileName`, `map`/`focalpoint`/`orientation`) sowie
+  `@modifyDate` tragen das Praefix `@` und werden beim Import ignoriert.
+- Textzellen werden immer als Text geschrieben (`cell.data_type = "s"`), damit Werte mit
+  `=` keine Formel werden. Zellwerte ueber 32 767 Zeichen werden gekuerzt; die
+  Exportbasis merkt sich das, damit der Import die Kuerzung nicht als Aenderung wertet.
+- Der Import braucht den Export-Snapshot aus `xlsx_export` (Schluessel `export_id` im
+  Blatt `Info`) fuer den Drei-Wege-Abgleich; ohne ihn ist nur ein Zwei-Wege-Vergleich
+  moeglich, leere Zellen bleiben dann unberuecksichtigt und die Oberflaeche verlangt eine
+  ausdrueckliche Bestaetigung. Zellen mit zwischenzeitlicher externer Aenderung werden
+  uebersprungen und gemeldet, nie still ueberschrieben.
+- Der Import legt einen regulaeren Arbeitsbestand an (`params_json.xlsx` mit Dateiname,
+  `export_id`, `three_way`); Laeufe daraus tragen `run.source = xlsx` und
+  `run.xlsx_export_id`. Die weitere Pruefung laeuft ueber Review, Dry Run und Schreiben
+  wie bei jeder Grid-Aenderung.
 - Werte im effektiven Stand immer als `CASE WHEN change.id IS NOT NULL THEN change.new_value
   ELSE json_extract(...) END` ausdruecken; `COALESCE` wuerde geleerte Werte falsch aufloesen.
 - Spaltenkennungen sind durchgaengig `std:<attribut>`, `custom:<feld-id>` oder
