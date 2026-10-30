@@ -205,6 +205,12 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# Lokale Laufzeitdaten
+data/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
 # PyPI configuration file
 .pypirc
 

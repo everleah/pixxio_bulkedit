@@ -1,0 +1,128 @@
+"""NiceGUI-Start mit Anmeldung ueber die Anwendungsdatenbank.
+
+Die Fachseiten (Profile, Scripts, Grid, Review) folgen in den naechsten
+Meilensteinen. Diese Datei etabliert Start, Migrationslauf, Anmeldung und
+Session-Ablauf.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import timedelta
+
+from nicegui import app, ui
+
+from app.auth import (
+    AuthenticationError,
+    LoginThrottle,
+    authenticate,
+    normalize_username,
+    session_is_expired,
+    session_payload,
+)
+from app.colors import PALETTE
+from app.db import (
+    SessionFactory,
+    create_engine_for,
+    create_session_factory,
+    run_migrations,
+    session_scope,
+)
+from app.models import AppUser
+from app.settings import get_settings
+
+logger = logging.getLogger(__name__)
+
+APP_TITLE = "pixx.io Bulk-Editor"
+
+
+def _current_user(session_factory: SessionFactory) -> AppUser | None:
+    payload = app.storage.user
+    if not payload or session_is_expired(payload):
+        return None
+    user_id = payload.get("user_id")
+    if not isinstance(user_id, int):
+        return None
+    with session_scope(session_factory) as session:
+        user = session.get(AppUser, user_id)
+        if user is None or not user.is_active:
+            return None
+        return user
+
+
+def _login_view(
+    session_factory: SessionFactory,
+    throttle: LoginThrottle,
+    timeout: timedelta,
+) -> None:
+    def submit() -> None:
+        key = normalize_username(username.value or "")
+        if throttle.is_blocked(key):
+            message.set_text("Zu viele Fehlversuche. Bitte spaeter erneut versuchen.")
+            return
+        with session_scope(session_factory) as session:
+            try:
+                user = authenticate(session, key, password.value or "")
+            except AuthenticationError:
+                throttle.register_failure(key)
+                message.set_text("Anmeldung fehlgeschlagen.")
+                return
+            app.storage.user.update(session_payload(user, timeout))
+        throttle.register_success(key)
+        ui.navigate.reload()
+
+    with ui.card().classes("absolute-center w-80 gap-2"):
+        ui.label(APP_TITLE).classes("text-lg font-semibold")
+        username = ui.input("Benutzername").props("outlined dense autofocus").classes("w-full")
+        password = (
+            ui.input("Passwort", password=True, password_toggle_button=True)
+            .props("outlined dense")
+            .classes("w-full")
+        )
+        message = ui.label().classes("text-negative text-sm")
+        ui.button("Anmelden", on_click=submit).props("unelevated").classes("w-full")
+        password.on("keydown.enter", lambda _: submit())
+
+
+def _home_view(user: AppUser, timeout: timedelta) -> None:
+    def logout() -> None:
+        app.storage.user.clear()
+        ui.navigate.reload()
+
+    with ui.column().classes("absolute-center items-center gap-2"):
+        ui.label(APP_TITLE).classes("text-2xl font-semibold")
+        ui.label(f"Angemeldet als {user.username} ({user.role.value})")
+        ui.label("Profilwahl, Scripts und Grid folgen in den naechsten Meilensteinen.").classes(
+            "text-sm"
+        )
+        ui.label(f"Sitzung laeuft nach {timeout.total_seconds() // 60:.0f} Minuten ab.").classes(
+            "text-xs"
+        )
+        ui.button("Abmelden", on_click=logout).props("flat")
+
+
+def main() -> None:
+    """Startet die Weboberflaeche; ohne gueltige Konfiguration startet sie nicht."""
+    settings = get_settings()
+    run_migrations(settings)
+    engine = create_engine_for(settings)
+    session_factory = create_session_factory(engine)
+    throttle = LoginThrottle(settings.login_max_attempts, settings.login_window_seconds)
+    timeout = timedelta(minutes=settings.session_timeout_minutes)
+
+    @ui.page("/")
+    def index() -> None:
+        ui.colors(primary=PALETTE.primary, negative=PALETTE.error, warning=PALETTE.warning)
+        user = _current_user(session_factory)
+        if user is None:
+            _login_view(session_factory, throttle, timeout)
+        else:
+            _home_view(user, timeout)
+
+    ui.run(
+        title=APP_TITLE,
+        favicon="\N{HERB}",
+        storage_secret=settings.storage_secret.get_secret_value(),
+        reload=False,
+        show=False,
+    )

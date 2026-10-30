@@ -81,11 +81,14 @@ Default section order:
 
 ## Child DOX Index
 
+- `app/AGENTS.md`: Anwendungspaket (Konfiguration, Datenbank, Modelle, Rechte, CLI,
+  NiceGUI-Start).
 - `plan/AGENTS.md`: Fachkonzept, bestaetigter Umsetzungsplan und deren Vorrangregeln.
-- `tests/AGENTS.md`: Offline-Tests, aktuell Import-Smoke-Tests der Entwicklungsbasis.
-- Root-owned: `README.md`, `LICENSE`, `.gitignore`, `requirements*.txt`,
-  `pyproject.toml` und `.vscode/` (Editor-Einstellungen, Erweiterungen, Quality-Tasks).
-- Anwendungscode ist noch nicht vorhanden.
+- `tests/AGENTS.md`: Offline-Tests der Anwendung und der Entwicklungsbasis.
+- Root-owned: `README.md`, `LICENSE`, `.gitignore`, `.env.example`, `requirements*.txt`,
+  `pyproject.toml`, `.vscode/`, `alembic.ini` und `migrations/` (Alembic-Umgebung
+  und Revisionen). `.env.example` ist die einzige Vorlage; echte `.env`-Dateien
+  bleiben ungetrackt.
 
 ## Development Environment
 
@@ -98,6 +101,9 @@ Default section order:
   ausfuehren. Den Client auch im Lock-Snapshot ungepinnt lassen; nach Updates Gates pruefen.
 - Ruff und Pyright werden in `pyproject.toml` konfiguriert; Pylance nutzt dieselbe
   Typpruefbasis. VS Code analysiert den gesamten Workspace.
+- Pflicht-Env der Anwendung sind `BULKEDIT_DB_PATH`, `BULKEDIT_MASTER_KEY` und
+  `BULKEDIT_STORAGE_SECRET`; Datenbank und erster Superuser entstehen ueber
+  `python -m app init-db` und `python -m app create-superuser --username ...`.
 - Vor Abschluss relevanter Aenderungen die in `README.md` dokumentierten Gates
   ausfuehren: `pip check`, Ruff-Lint, Ruff-Formatcheck, Pyright und pytest, jeweils
   ueber `.\.venv\Scripts\python.exe -m ...`.
