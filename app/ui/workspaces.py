@@ -55,6 +55,7 @@ from app.workspaces import (
     expiry_warning_days,
     list_workspaces,
     load_assets,
+    reopen_workspace,
     resolve_targets,
     set_change,
     store_columns,
@@ -806,6 +807,53 @@ def register_workspace_pages(
             status.set_text(t("Arbeitsbestand gelöscht."))
             workspace_rows.refresh()
 
+        def reopen(workspace_id: int) -> None:
+            with session_scope(session_factory) as session:
+                workspace = session.get(Workspace, workspace_id)
+                if workspace is None:
+                    return
+                reopen_workspace(session, workspace)
+            status.set_text(t("Arbeitsbestand wieder geöffnet."))
+            workspace_rows.refresh()
+
+        list_state: dict[str, Any] = {"include_closed": False, "delete": None}
+
+        with ui.dialog() as delete_dialog, ui.card().classes("w-[460px] gap-2"):
+            delete_text = ui.label("").classes("text-sm")
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button(t("Abbrechen"), on_click=delete_dialog.close).props("flat dense")
+                delete_confirm = ui.button(t("Endgültig löschen")).props(
+                    "unelevated dense color=negative"
+                )
+
+        def _ask_delete(workspace_id: int, name: str, changed: int) -> None:
+            list_state["delete"] = workspace_id
+            if changed:
+                text = t(
+                    "Arbeitsbestand '{name}' endgültig löschen? {changes} nicht geschriebene "
+                    "Änderungen gehen dabei verloren.",
+                    name=name,
+                    changes=changed,
+                )
+            else:
+                text = t(
+                    "Arbeitsbestand '{name}' endgültig löschen? Der Entwurf und seine Zeilen "
+                    "werden entfernt.",
+                    name=name,
+                )
+            delete_text.set_text(text)
+            delete_dialog.open()
+
+        def _confirm_delete() -> None:
+            workspace_id = list_state["delete"]
+            if not isinstance(workspace_id, int):
+                return
+            list_state["delete"] = None
+            delete_dialog.close()
+            _remove(workspace_id)
+
+        delete_confirm.on_click(_confirm_delete)
+
         @ui.refreshable
         def workspace_rows() -> None:
             with session_scope(session_factory) as session:
@@ -814,12 +862,15 @@ def register_workspace_pages(
                         "id": workspace.id,
                         "name": workspace.name or t("Arbeitsbestand {id}", id=workspace.id),
                         "status": workspace.status.value,
+                        "closed": workspace.status is WorkspaceStatus.CLOSED,
                         "rows": workspace.row_count,
                         "changed": changed_count(session, workspace.id),
                         "updated": workspace.updated_at.strftime("%d.%m.%Y %H:%M"),
                         "expiry": _expiry_text(workspace),
                     }
-                    for workspace in list_workspaces(session, user.id)
+                    for workspace in list_workspaces(
+                        session, user.id, include_closed=list_state["include_closed"]
+                    )
                 ]
             if not items:
                 ui.label(t("Keine offenen Arbeitsbestände.")).classes("text-sm")
@@ -832,22 +883,40 @@ def register_workspace_pages(
                     ui.label(t("{count} Änderungen", count=item["changed"])).classes("w-28 text-xs")
                     ui.label(item["updated"]).classes("w-32 text-xs")
                     ui.label(item["expiry"]).classes("w-44 text-xs").style(TEXT_STYLE["warning"])
-                    action_button(
-                        "grid_on",
-                        t("Öffnen"),
-                        lambda workspace_id=int(item["id"]): ui.navigate.to(
-                            f"/workspaces/{workspace_id}"
-                        ),
-                    )
+                    if item["closed"]:
+                        action_button(
+                            "restart_alt",
+                            t("Wieder öffnen"),
+                            lambda workspace_id=int(item["id"]): reopen(workspace_id),
+                        )
+                    else:
+                        action_button(
+                            "grid_on",
+                            t("Öffnen"),
+                            lambda workspace_id=int(item["id"]): ui.navigate.to(
+                                f"/workspaces/{workspace_id}"
+                            ),
+                        )
                     action_button(
                         "delete",
                         t("Arbeitsbestand löschen"),
-                        lambda workspace_id=int(item["id"]): _remove(workspace_id),
+                        lambda workspace_id=int(item["id"]), name=str(item["name"]), changed=int(item["changed"]): (
+                            _ask_delete(workspace_id, name, changed)
+                        ),
                     )
 
         with ui.row().classes("w-full items-center gap-2 mt-4"):
             ui.label(t("Offene Arbeitsbestände")).classes("font-semibold")
+            closed_switch = ui.switch(
+                t("geschlossene anzeigen"), value=list_state["include_closed"]
+            )
             action_button("refresh", t("Liste aktualisieren"), workspace_rows.refresh)
+
+        def _toggle_closed() -> None:
+            list_state["include_closed"] = bool(closed_switch.value)
+            workspace_rows.refresh()
+
+        closed_switch.on_value_change(lambda _: _toggle_closed())
         workspace_rows()
 
     @ui.page("/workspaces/{workspace_id}")
@@ -875,6 +944,7 @@ def register_workspace_pages(
             revision = int(workspace.edit_revision)
             changed = changed_count(session, workspace.id)
             warning = expiry_warning_days(workspace)
+            expiry_date = workspace.expires_at.strftime("%d.%m.%Y") if workspace.expires_at else ""
             schema = schema_cache.get(profile)
             columns = view_columns(session, workspace, schema)
 
@@ -901,6 +971,13 @@ def register_workspace_pages(
             ui.label(t("Status: {status}", status=workspace_status.value)).classes("text-sm").style(
                 TEXT_STYLE["warning"]
             )
+        if expiry_date:
+            ui.label(
+                t(
+                    "Der Entwurf bleibt bis {date} erhalten; jede Aktivität verlängert die Frist.",
+                    date=expiry_date,
+                )
+            ).classes("text-xs")
         if warning is not None:
             ui.label(
                 t(
@@ -1062,12 +1139,20 @@ def register_workspace_pages(
             _refresh_counter()
             column_dialog.open()
 
+        with ui.dialog() as close_dialog, ui.card().classes("w-[480px] gap-2"):
+            close_text = ui.label("").classes("text-sm")
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button(t("Abbrechen"), on_click=close_dialog.close).props("flat dense")
+                ui.button(t("Schließen"), on_click=lambda: _confirm_close()).props(
+                    "unelevated dense"
+                )
+
         all_button.on_click(lambda: _set_all(True))
         none_button.on_click(lambda: _set_all(False))
         apply_button.on_click(_apply_columns)
         column_filter.on_value_change(lambda _: _apply_filter())
 
-        with ui.row().classes("w-full flex-wrap items-end gap-2"):
+        with ui.row().classes("w-full flex-wrap items-end gap-2") as filter_row:
             filter_column_select = (
                 ui.select(column_options, value=columns[0].key, label=t("Spalte"))
                 .props("outlined dense")
@@ -1075,6 +1160,7 @@ def register_workspace_pages(
             )
             filter_input = ui.input(t("Filter (enthält)")).props("outlined dense").classes("w-48")
             only_changed_switch = ui.switch(t("nur geänderte Zeilen"), value=False)
+        with ui.row().classes("w-full flex-wrap items-end gap-2") as bulk_row:
             target_column_select = (
                 ui.select(
                     {column.key: column.label for column in writable},
@@ -1296,10 +1382,32 @@ def register_workspace_pages(
             await reload_changes_and_grid()
 
         def close_workspace_now() -> None:
+            if changed:
+                close_text.set_text(
+                    t(
+                        "Arbeitsbestand '{name}' schließen? Der Entwurf verschwindet aus der "
+                        "Liste; {changes} nicht geschriebene Änderungen bleiben nur über "
+                        "„geschlossene anzeigen“ erreichbar.",
+                        name=name,
+                        changes=changed,
+                    )
+                )
+            else:
+                close_text.set_text(
+                    t(
+                        "Arbeitsbestand '{name}' schließen? Der Entwurf verschwindet aus der "
+                        "Liste und lässt sich über „geschlossene anzeigen“ wieder öffnen.",
+                        name=name,
+                    )
+                )
+            close_dialog.open()
+
+        def _confirm_close() -> None:
             with session_scope(session_factory) as session:
                 current = session.get(Workspace, workspace_id)
                 if current is not None:
                     close_workspace(session, current)
+            close_dialog.close()
             ui.navigate.to(LIST_ROUTE)
 
         async def export_excel() -> None:
@@ -1343,24 +1451,31 @@ def register_workspace_pages(
             else:
                 ui.notify(t("Export erstellt: {rows} Zeilen.", rows=exported.row_count))
 
-        with ui.row().classes("w-full items-center gap-1 mt-1"):
+        with filter_row:
+            ui.separator().props("vertical")
             action_button("filter_alt_off", t("Filter zurücksetzen"), reset_filter)
             action_button("arrow_upward", t("Aufsteigend sortieren"), lambda: sort_by("asc"))
             action_button("arrow_downward", t("Absteigend sortieren"), lambda: sort_by("desc"))
-            action_button("straighten", t("Spalten an Inhalt anpassen"), fit_content)
-            action_button("open_in_full", t("Spalten an Anzeige anpassen"), fit_display)
+
+        with bulk_row:
+            ui.separator().props("vertical")
             action_button("edit_note", t("Wert auf Ziel setzen"), apply_value)
             action_button("undo", t("Änderungen verwerfen"), revert_selection)
+
+        with ui.row().classes("w-full items-center gap-1 mt-1"):
+            action_button("straighten", t("Spalten an Inhalt anpassen"), fit_content)
+            action_button("open_in_full", t("Spalten an Anzeige anpassen"), fit_display)
             action_button("view_column", t("Spalten auswählen"), _open_columns)
-            action_button(
-                "table_view", t("Excel-Export (markierte oder gefilterte Zeilen)"), export_excel
-            )
-            action_button(
-                "fact_check",
-                t("Review und schreiben"),
-                lambda: ui.navigate.to(f"/workspaces/{workspace_id}/review"),
-            )
-            action_button("close", t("Arbeitsbestand schließen"), close_workspace_now)
+            with ui.row().classes("items-center gap-1 ml-auto"):
+                action_button(
+                    "table_view", t("Excel-Export (markierte oder gefilterte Zeilen)"), export_excel
+                )
+                action_button(
+                    "fact_check",
+                    t("Review und schreiben"),
+                    lambda: ui.navigate.to(f"/workspaces/{workspace_id}/review"),
+                )
+                action_button("close", t("Arbeitsbestand schließen"), close_workspace_now)
 
         filter_input.on("keydown.enter", lambda _: apply_filter_now())
         only_changed_switch.on_value_change(lambda _: apply_filter_now())

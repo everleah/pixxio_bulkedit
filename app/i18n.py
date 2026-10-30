@@ -21,6 +21,18 @@ LOCALE_STORAGE_KEY = "locale"
 
 # Englische Übersetzungen; Schlüssel ist der deutsche Quelltext.
 EN_TRANSLATIONS: dict[str, str] = {
+    # Arbeitsbestand: Texte ohne offene Aenderungen
+    "Arbeitsbestand '{name}' endgültig löschen? Der Entwurf und seine Zeilen werden entfernt.": "Delete workspace '{name}' permanently? The draft and its rows will be removed.",
+    "Arbeitsbestand '{name}' schließen? Der Entwurf verschwindet aus der Liste und lässt sich über „geschlossene anzeigen“ wieder öffnen.": "Close workspace '{name}'? The draft disappears from the list and can be reopened via \"show closed\".",
+    # Arbeitsbestand schliessen, loeschen, wieder oeffnen
+    "Arbeitsbestand '{name}' endgültig löschen? {changes} nicht geschriebene Änderungen gehen dabei verloren.": "Delete workspace '{name}' permanently? {changes} unsaved changes will be lost.",
+    "Arbeitsbestand '{name}' schließen? Der Entwurf verschwindet aus der Liste; {changes} nicht geschriebene Änderungen bleiben nur über „geschlossene anzeigen“ erreichbar.": "Close workspace '{name}'? The draft disappears from the list; {changes} unsaved changes remain reachable only via \"show closed\".",
+    "Arbeitsbestand wieder geöffnet.": "Workspace reopened.",
+    "Der Entwurf bleibt bis {date} erhalten; jede Aktivität verlängert die Frist.": "The draft is kept until {date}; any activity extends the period.",
+    "Endgültig löschen": "Delete permanently",
+    "Schließen": "Close",
+    "Wieder öffnen": "Reopen",
+    "geschlossene anzeigen": "show closed",
     # Loeschen von Scripts und Profilen
     "Löschen": "Delete",
     "Profil '{name}' endgültig löschen? API-Key und Zuordnungen entfallen.": "Delete profile '{name}' permanently? API key and assignments will be removed.",

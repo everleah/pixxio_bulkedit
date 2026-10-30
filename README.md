@@ -171,6 +171,14 @@ Namen vor dem Senden auf.
 - Spalten kommen aus `COLUMNS` des Scripts (`std:subject`, `custom:Kampagne`,
   `standard:DateSent`); ohne `COLUMNS` erscheinen Dateiname, Titel, Beschreibung und bis
   zu zwölf Custom-Felder.
+- **Arbeit unterbrechen:** Einfach die Seite verlassen. Der Entwurf bleibt in
+  „Offene Arbeitsbestände" und lässt sich am nächsten Tag über „Öffnen" fortsetzen; die
+  Kopfzeile des Grids nennt das Datum, bis zu dem er erhalten bleibt (jede Aktivität
+  verlängert die Frist, Standard 30 Tage).
+- Bedienfelder stehen bei dem, was sie steuern: erste Zeile Filter und Sortierung
+  (Spalte, Filtertext, „nur geänderte Zeilen" plus die zugehörigen Icons), zweite Zeile
+  Massenänderung (Zielspalte, Wert, Ziel plus „Wert auf Ziel setzen" und „Änderungen
+  verwerfen"), darunter die Spaltenwerkzeuge und rechts Export, Review und Schließen.
 - „Spalten auswählen" (Icon `view_column`) öffnet die Spaltenauswahl: alle Felder des
   Profils in drei Gruppen (Standardattribute, eigene Metadatenfelder,
   Standard-Metadatenfelder), **innerhalb der Gruppe alphabetisch sortiert**, mit
@@ -199,7 +207,9 @@ Namen vor dem Senden auf.
   der Hinweis „in einem anderen Tab geändert"; Schreibversuche mit veralteter Revision
   werden abgelehnt.
 - Entwürfe laufen nach 30 Tagen Inaktivität ab; ab sieben Resttagen warnt die Liste.
-  Schließen entfernt den Arbeitsbestand aus der Liste, Löschen entfernt ihn ganz.
+  „Arbeitsbestand schließen" fragt nach und nimmt den Entwurf nur aus der Liste — die
+  Daten bleiben, und „geschlossene anzeigen" mit „Wieder öffnen" holt ihn zurück.
+  „Arbeitsbestand löschen" fragt ebenfalls nach und entfernt den Entwurf endgültig.
 
 ## Review und Schreiben
 

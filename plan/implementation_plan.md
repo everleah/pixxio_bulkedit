@@ -353,6 +353,8 @@ Schreibmoeglichkeit Assets fuer einen Arbeitsbestand bestimmen.
 - Ablaufdatum anzeigen; unter sieben verbleibenden Tagen warnen.
 - Nach 30 Tagen Inaktivitaet loeschen, sofern nicht bewusst verlaengert.
 - Laufende Schreibauftraege von der Entwurfsbereinigung ausnehmen.
+- Schliessen nimmt den Entwurf nur aus der Liste (Daten bleiben) und laesst sich
+  rueckgaengig machen; Loeschen verlangt eine Bestaetigung.
 
 Umgesetzt (30.10.2026, Backend): `app/schema.py` (Spaltenkennungen `std:*`, `custom:<id>`,
 `standard:<id>`, Auflösung von Namen, `SchemaCache` mit 15 Minuten TTL), `app/normalize.py`

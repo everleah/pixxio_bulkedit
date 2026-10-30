@@ -69,6 +69,15 @@
   schreibt die Seite direkt ueber `set_change` und sendet dazu die zuletzt gesehene
   `edit_revision`. Eine veraltete Revision meldet der Service als Konflikt; die Seite
   zeigt dann den Hinweis "in einem anderen Tab geaendert" und verlangt ein Neuladen.
+- Bedienung nach Zugehoerigkeit gruppieren: Filterzeile (Spalte, Filtertext, "nur
+  geaenderte Zeilen" plus Filterschaltflaechen und Sortierung), Zeile fuer
+  Massenaenderungen (Zielspalte, Wert, Ziel plus "Wert auf Ziel setzen" und "Aenderungen
+  verwerfen"), darunter Spaltenwerkzeuge und rechts Export/Review/Schliessen. Neue
+  Schaltflaechen gehoeren in die Gruppe ihres Eingabefelds.
+- "Arbeitsbestand schliessen" und "Arbeitsbestand loeschen" oeffnen einen Bestaetigungsdialog
+  (Text nennt Name und Zahl offener Aenderungen); Schliessen setzt nur den Status, Loeschen
+  entfernt Daten. "geschlossene anzeigen" blendet geschlossene Entwuerfe mit "Wieder
+  oeffnen" ein. Die Grid-Seite nennt das Ablaufdatum des Entwurfs.
 - Zellhervorhebung und Zeilenmarkierung laufen ueber AG-Grid-Ausdruecke
   (`cellClassRules`, `rowClassRules`) mit `!!data && ...`, weil AG Grid die Regeln auch
   fuer noch nicht geladene Zeilen auswertet.

@@ -252,14 +252,19 @@ def clear_columns(session: Session, workspace: Workspace) -> None:
     touch(session, workspace)
 
 
-def list_workspaces(session: Session, owner_id: int) -> Sequence[Workspace]:
-    return list(
-        session.scalars(
-            select(Workspace)
-            .where(Workspace.owner_id == owner_id, Workspace.status != WorkspaceStatus.CLOSED)
-            .order_by(Workspace.updated_at.desc())
-        )
-    )
+def list_workspaces(
+    session: Session, owner_id: int, *, include_closed: bool = False
+) -> Sequence[Workspace]:
+    statement = select(Workspace).where(Workspace.owner_id == owner_id)
+    if not include_closed:
+        statement = statement.where(Workspace.status != WorkspaceStatus.CLOSED)
+    return list(session.scalars(statement.order_by(Workspace.updated_at.desc())))
+
+
+def reopen_workspace(session: Session, workspace: Workspace) -> None:
+    """Nimmt einen geschlossenen Entwurf wieder in die Liste auf."""
+    workspace.status = WorkspaceStatus.READY
+    touch(session, workspace)
 
 
 # --- Laden -------------------------------------------------------------------
@@ -754,6 +759,7 @@ __all__ = [
     "list_workspaces",
     "load_assets",
     "mark_failed",
+    "reopen_workspace",
     "resolve_targets",
     "revert_change",
     "set_change",

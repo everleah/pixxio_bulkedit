@@ -165,6 +165,10 @@
   Review-Seite prueft ohne Spalteneinschraenkung (`script_columns=None`), damit eine
   verborgene Spalte keine erfasste Aenderung blockiert. Der Excel-Import speichert die
   Spalten der Datei als Auswahl.
+- `close_workspace` setzt nur `status = closed` und laesst Snapshot und ChangeSet stehen;
+  `list_workspaces(..., include_closed=True)` zeigt solche Entwuerfe, `reopen_workspace`
+  setzt sie wieder auf `ready` und verlaengert die Frist. Erst `delete_workspace` loescht
+  Daten (CASCADE auf Snapshot und ChangeSet). Die UI fragt vor beiden Aktionen nach.
 - Standardattribute der Datei (`std:*`) und Metadaten (`custom:*`, `standard:*`) werden
   getrennt gelesen: erstere direkt am File, letztere aus `metadataFields[str(feld_id)]`.
   Der Dateistatus kommt aus `fileState.id` und wird ueber die Optionen zu seinem Namen

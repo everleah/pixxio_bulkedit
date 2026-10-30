@@ -314,6 +314,22 @@ def test_arbeitsbestand_anlegen_und_fuellen(workspace: Workspace) -> None:
     assert workspace.expires_at > utc_now() + timedelta(days=29)
 
 
+def test_geschlossener_bestand_laesst_sich_wieder_oeffnen(
+    session: Session, workspace: Workspace, owner: AppUser
+) -> None:
+    from app.workspaces import list_workspaces, reopen_workspace
+
+    close_workspace(session, workspace)
+    assert workspace.status is WorkspaceStatus.CLOSED
+    assert list_workspaces(session, owner.id) == []
+    assert [item.id for item in list_workspaces(session, owner.id, include_closed=True)] == [
+        workspace.id
+    ]
+    reopen_workspace(session, workspace)
+    assert workspace.status is WorkspaceStatus.READY
+    assert [item.id for item in list_workspaces(session, owner.id)] == [workspace.id]
+
+
 def test_snapshot_wert_lesen(session: Session, workspace: Workspace) -> None:
     assert snapshot_value(session, workspace.id, 1, "std:subject") == "Zebra"
     with pytest.raises(WorkspaceError):
