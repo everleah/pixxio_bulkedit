@@ -28,6 +28,7 @@ def page_header(title: str, user: AppUser) -> None:
     ):
         ui.label(title).classes("text-lg font-semibold")
         ui.link("Start", "/").classes("text-white")
+        ui.link("Scripts", "/scripts").classes("text-white")
         if user.role is Role.SUPERUSER:
             ui.link("Profile", "/admin/profiles").classes("text-white")
             ui.link("Benutzer", "/admin/users").classes("text-white")

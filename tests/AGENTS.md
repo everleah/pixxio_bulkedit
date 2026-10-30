@@ -22,6 +22,9 @@
 - `test_profiles.py`: Profile (Verschluesselung, Namenspruefung, Key-Rotation, Audit),
   Verbindungstest und `ClientFactory`-Cache; `current_user_name` und `response_mapping`
   laufen gegen nachgebaute Client-Antworten.
+- `test_scripts.py`: Script-Vertrag (`PARAMS`, `COLUMNS`, Filter, Ergebnisse),
+  RestrictedPython-Abweisungen, Fassade gegen einen nachgebauten Client, Versionierung
+  und Vorlagen sowie der Kindprozess mit Zeitlimit.
 
 ## Local Contracts
 

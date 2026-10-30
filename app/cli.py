@@ -24,6 +24,7 @@ from app.crypto import SecretBox, generate_master_key
 from app.db import create_engine_for, create_session_factory, run_migrations, session_scope
 from app.models import AppUser, Profile, Role
 from app.profiles import ProfileData, ProfileError, create_profile, update_profile
+from app.scripts.service import ensure_templates
 from app.settings import Settings, get_settings
 
 EXIT_CONFIG_ERROR = 2
@@ -68,7 +69,12 @@ def command_init_db(_args: argparse.Namespace) -> int:
     settings = _require_settings()
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     run_migrations(settings)
+    factory = create_session_factory(create_engine_for(settings))
+    with session_scope(factory) as session:
+        created = ensure_templates(session)
     print(f"Datenbank bereit: {settings.db_path}")
+    if created:
+        print(f"{created} Script-Vorlagen angelegt.")
     return 0
 
 

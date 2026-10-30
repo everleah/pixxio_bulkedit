@@ -14,6 +14,9 @@
 - `admin.py`: `register_admin_pages` registriert `/admin/profiles` und `/admin/users`.
   Beide Seiten pruefen die Rolle serverseitig, zeigen eine Liste und ein gemeinsames
   Formular fuer Anlegen und Bearbeiten.
+- `scripts.py`: `register_script_pages` registriert `/scripts` (Liste, Vorlagen kopieren)
+  und `/scripts/{script_id}` (Editor mit `ui.codemirror`, Parameterformular aus `PARAMS`,
+  Pruefen, Dry Run, Speichern, Veroeffentlichen; `script_id = 0` legt neu an).
 
 ## Local Contracts
 
@@ -28,6 +31,10 @@
 - Aktionen in Listen sind Icon-Buttons mit Tooltip und `aria-label`.
 - Farben ausschliesslich aus `app/colors.py`; Schaltflaechen tragen nur Text, wenn sie
   kein Listenwerkzeug sind.
+- Script-Seiten rufen Ausfuehrungen ueber `run.io_bound` und `ScriptRunner` auf; der
+  API-Key wird nur fuer den Aufruf entschluesselt und nie angezeigt oder protokolliert.
+- Bearbeiten koennen nur Benutzer mit `can_edit_scripts`; alle anderen sehen
+  ausschliesslich Pruefen, Dry Run und die Versionsauswahl.
 
 ## Work Guidance
 
@@ -44,6 +51,8 @@
 - `python -m app serve`, danach als Superuser `/admin/profiles` und `/admin/users`
   aufrufen und "Verbindung testen" ausfuehren.
 - Als Nicht-Superuser dieselben Pfade aufrufen: "Kein Zugriff" ohne Datenabruf.
+- `/scripts` als Superuser und als Viewer aufrufen; der Viewer darf keinen
+  Speichern-Knopf sehen, aber einen Dry Run ausfuehren.
 
 ## Child DOX Index
 

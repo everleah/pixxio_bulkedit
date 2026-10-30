@@ -23,7 +23,10 @@
 - `clients.py`: `ClientFactory` haelt je Profil einen pixx.io-Client, ent- und
   verschluesselt den Key nur dort und liefert `current_user_name` fuer Verbindungstests.
 - `ui/`: `guard.py` (Session- und Rollenpruefung), `shell.py` (Palette und Kopfzeile),
-  `admin.py` (Seiten `/admin/profiles` und `/admin/users`); Details in `ui/AGENTS.md`.
+  `admin.py` (Seiten `/admin/profiles` und `/admin/users`), `scripts.py` (Liste und Editor
+  unter `/scripts`); Details in `ui/AGENTS.md`.
+- `scripts/`: Abfrage-Scripts mit Vertrag, RestrictedPython, read-only Fassade `px`,
+  Kindprozess-Ausfuehrung, Versionierung und Vorlagen; Details in `scripts/AGENTS.md`.
 - `cli.py` mit `__main__.py`: `init-db`, `generate-master-key`, `create-superuser`,
   `create-profile`, `serve`.
 - `spike/`: Machbarkeitspruefungen der Phase 1 gegen ein Testsystem. `settings.py` liest
@@ -88,5 +91,7 @@
 
 ## Child DOX Index
 
-- `ui/AGENTS.md`: NiceGUI-Seiten, Zugriffsschutz je Seite und Profile-/Benutzerverwaltung.
+- `ui/AGENTS.md`: NiceGUI-Seiten, Zugriffsschutz je Seite, Profile-/Benutzerverwaltung
+  und Script-Editor.
+- `scripts/AGENTS.md`: Script-Vertrag, Sicherheitsschicht, Fassade, Ausfuehrung, Versionen.
 - `models/` wird hier mitgefuehrt.

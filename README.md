@@ -49,8 +49,8 @@ Fuer Abnahmen dokumentierter Stand: `pixxio-client 0.4.4` (PyPI, 30.10.2026).
 ## Projektstruktur
 
 - `app/`: Anwendungspaket mit Einstellungen, Datenbankschicht, Modellen, Anmeldung,
-  Profilen und Client-Factory, Farben, Kommandozeile, NiceGUI-Start sowie `ui/` fuer
-  Seiten und Zugriffsschutz.
+  Profilen und Client-Factory, Farben, Kommandozeile, NiceGUI-Start, `ui/` fuer Seiten
+  und Zugriffsschutz sowie `scripts/` fuer das Abfrage-Script-System.
 - `migrations/` und `alembic.ini`: Alembic-Umgebung mit der Initial-Revision `0001`.
 - `tests/`: Offline-Tests ohne pixx.io-Zugriff.
 - `plan/`: Fachkonzept und bestaetigter Umsetzungsplan.
@@ -105,6 +105,48 @@ Weitere Profile, Benutzer und Rechte verwaltet ein Superuser unter `/admin/profi
 `/admin/users`. Der gespeicherte Key wird dort nur als Hint (`••••abcd`) angezeigt; ein
 leeres Key-Feld behaelt den bisherigen Key. "Verbindung testen" meldet den API-Benutzer
 und protokolliert das Ergebnis im Admin-Audit.
+
+## Abfrage-Scripts
+
+Scripts bestimmen, welche Assets in einen Arbeitsbestand geladen werden - gelesen wird
+ausschliesslich ueber die App, nie im Script. `python -m app init-db` legt vier Vorlagen
+an (Collection, Verzeichnis, ID-Liste, Suche); eigene Scripts entstehen unter `/scripts`.
+
+Vertrag eines Scripts:
+
+```python
+PARAMS = {
+    "collection": {"type": "str", "label": "Collection", "required": True},
+    "include_archived": {"type": "bool", "label": "Archivierte einbeziehen", "default": False},
+}
+COLUMNS = ["std:subject", "custom:Kampagne"]
+
+
+def query(px, params):
+    col = px.collection(params["collection"])          # Name oder ID
+    return px.filters.collection(col["id"], include_archived=params["include_archived"])
+```
+
+Erlaubte Rueckgaben sind ein Filter-Dict, eine Liste von File-IDs oder
+`px.result(filter=..., ids=..., columns=..., note=...)`. Die Fassade liest nur
+(`collection(s)`, `directory/directories`, `metadata_fields`, `count`, `find_ids`, `file`,
+`log`, `filters`), liefert einfache Dicts und begrenzt Ergebnisse auf `max_rows` des
+Profils sowie 1000 API-Aufrufe je Lauf.
+
+Sicherheit: Scripts laufen uebersetzt mit RestrictedPython (keine Imports, kein `open`,
+`eval`, `exec`, keine `_`-Attribute) in einem eigenen Prozess mit Zeitlimit
+(`BULKEDIT_SCRIPT_TIMEOUT_SECONDS`) und begrenzter Ausgabe
+(`BULKEDIT_SCRIPT_MAX_OUTPUT_CHARS`). Der Client mit dem API-Key existiert nur in diesem
+Prozess; das Script sieht ihn nicht. Speichern und Veroeffentlichen duerfen nur Benutzer
+mit Script-Recht (`can_edit_scripts` oder Superuser); alle anderen fuehren
+veroeffentlichte Versionen aus. Jeder Lauf landet mit Version, Parametern und Ergebnis in
+der Tabelle `run`.
+
+Filter folgen der pixx.io-API: Verknuepfungen ueber `px.filters.and_(...)`/`or_(...)`
+(`connectorAnd`/`connectorOr`), Negation ueber `px.filters.not_(...)` (`inverted`).
+Metadatenfilter (`metadata_text`, `metadata_selection`, `metadata_date`,
+`has_metadata_field`) akzeptieren eine Feld-ID oder einen Feldnamen; die Fassade loest
+Namen vor dem Senden auf.
 
 ## Phase-1-Spike (nur lesend)
 

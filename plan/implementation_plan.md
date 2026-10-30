@@ -292,6 +292,40 @@ RestrictedPython und Subprozess sind zusaetzliche Schutzmassnahmen, keine belast
 Isolation gegenueber boesartigen Script-Autoren. Das im Fachkonzept vorgesehene
 delegierbare Script-Bearbeitungsrecht wird im ersten Meilenstein nicht angeboten.
 
+Umgesetzt (Oktober 2026): `app/scripts/` mit Vertrag (`contract.py`), Sicherheitsschicht
+(`restricted.py`: AST-Pruefung plus RestrictedPython), read-only Fassade (`facade.py`),
+Kindprozess (`worker.py`), Runner mit Zeitlimit (`runner.py`), Versionierung und Runs
+(`service.py`) sowie vier Vorlagen (`templates.py`); Seiten `/scripts` und
+`/scripts/{id}` in `app/ui/scripts.py`.
+
+**Befunde zu Datei-Filtern (30.10.2026, geprueft gegen `hoerl-demo.px.media`):**
+
+- Die gueltigen `filterType`-Werte und ihre Felder stehen in `openapi.json` des
+  Client-Repositories (71 `FilesFilter*`-Schemas). Verknuepfungen laufen ueber
+  `connectorAnd`/`connectorOr` mit `filters`, Negation ueber `inverted` auf jedem Filter.
+- Live bestaetigt: `collection`, `fileName`, `files` (`fileIDs`), `searchTerm`,
+  `fileExtension`, `isArchived`, Metadatenfilter (`metadataFieldText`,
+  `hasMetadataField`), `connectorAnd`/`connectorOr` und `inverted`.
+  Beispiel: Collection mit 4 Assets ∧ `fileName` "bmp" = 1; `isArchived` = 0, invertiert
+  = 1177 (alle Assets).
+- `all` hat kein `term`-Feld; ein mitgeschicktes `term` wird ignoriert. Unbekannte Felder
+  werden von der API stillschweigend verworfen, deshalb prueft die Anwendung Filter
+  selbst gegen die Feldtabelle.
+- `includeArchived` ist im Schema vorhanden, im Testsystem aber ohne Wirkung (keine
+  archivierten Assets). `includeSubdirectories` bleibt ungeprueft (keine Dateien in
+  Unterverzeichnissen).
+- Die `directories`-API akzeptiert `pageSize` bis 20; der Client-Default 100 liess
+  `Directory.get_all()` scheitern. Behoben im Client (`_max_page_size = 20`, Auslieferung
+  als 0.4.5). Gueltige `responseFields` sind `id`, `createDate`, `modifyDate`, `parentID`,
+  `name`, `quantity`, `quantityWithSubdirectories`, `permissions`, `hasChildren`.
+- Das Testsystem fuehrt 19 Custom- und 376 Standard-Metadatenfelder; `metadata_fields`
+  laedt beide vollstaendig (395 Eintraege) unabhaengig vom Zeilenlimit des Profils.
+
+Die Fassade weicht damit bewusst vom Fachkonzept ab: `px.filters.and_/or_/not_` heissen
+`connectorAnd`/`connectorOr` plus `inverted`, und Metadatenfilter erwarten ein Feld
+(ID oder Name), das die Fassade vor dem Senden zu `customMetadataFieldID` bzw.
+`standardMetadataFieldID` aufloest.
+
 ### Abschlusskriterium
 
 Rollen- und Profilgrenzen sind getestet; Scripts koennen ohne direkte

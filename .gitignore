@@ -207,6 +207,7 @@ cython_debug/
 
 # Lokale Laufzeitdaten
 data/
+.nicegui/
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
