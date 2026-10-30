@@ -17,8 +17,8 @@
 - `worker.py`: Kindprozess-Einstieg; baut den Client und schreibt genau ein Ergebnis.
 - `runner.py`: `ScriptRunner` (Pruefen, Parametertypen, Start mit Zeitlimit),
   `ScriptInterface` und `ScriptOutcome`.
-- `service.py`: Versionen anlegen, veroeffentlichen, Vorlagen sicherstellen, Runs
-  protokollieren, Rechtepruefung.
+- `service.py`: Versionen anlegen, umbenennen, veroeffentlichen, Vorlagen sicherstellen,
+  Runs protokollieren, Rechtepruefung.
 - `templates.py`: mitgelieferte Vorlagen (Collection, Verzeichnis, ID-Liste, Suche).
 
 ## Local Contracts
@@ -40,6 +40,9 @@
   `MAX_CALLS` Aufrufe je Lauf.
 - Gespeicherte Versionen sind unveraenderlich; jedes Speichern erzeugt eine neue Version.
   Vorlagen sind unveraenderlich und werden nur kopiert.
+- `rename_script` aendert nur den Namen (getrimmt, nicht leer, eindeutig) und erzeugt
+  bewusst keine Version; Vorlagen bleiben auch hier gesperrt. Laeufe und Versionen haengen
+  an der ID, nicht am Namen.
 - Nur `can_edit_scripts` (Superuser oder Recht) darf speichern/veroeffentlichen;
   Ausfuehren veroeffentlichter Scripts ist fuer alle angemeldeten Benutzer erlaubt.
 - Fehlermeldungen an die UI sind deutsch und enthalten nie den API-Key.

@@ -134,6 +134,25 @@ def save_version(
     return version
 
 
+def rename_script(session: Session, script: QueryScript, name: str, *, actor: AppUser) -> str:
+    """Benennt ein Script um; Vorlagen bleiben unveraenderlich."""
+    if not can_edit_scripts(actor):
+        raise ScriptPermissionError("Kein Recht zum Bearbeiten von Scripts.")
+    if script.is_template:
+        raise ScriptPermissionError("Vorlagen sind unveraenderlich.")
+    cleaned = name.strip()
+    if not cleaned:
+        raise ScriptContractError("Der Scriptname darf nicht leer sein.")
+    if cleaned == script.name:
+        return cleaned
+    existing = session.scalar(select(QueryScript.id).where(QueryScript.name == cleaned))
+    if existing is not None and existing != script.id:
+        raise ScriptContractError(f"Das Script {cleaned!r} existiert bereits.")
+    script.name = cleaned
+    session.flush()
+    return cleaned
+
+
 def publish_version(
     session: Session, script: QueryScript, version: QueryScriptVersion, *, actor: AppUser
 ) -> None:
@@ -285,6 +304,7 @@ __all__ = [
     "published_version",
     "recent_runs",
     "record_run",
+    "rename_script",
     "run_summary",
     "save_version",
 ]

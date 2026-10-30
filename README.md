@@ -142,6 +142,11 @@ mit Script-Recht (`can_edit_scripts` oder Superuser); alle anderen fuehren
 veroeffentlichte Versionen aus. Jeder Lauf landet mit Version, Parametern und Ergebnis in
 der Tabelle `run`.
 
+Umbenennen: Der Name steht im Editor als Feld und wird mit „Speichern (Name und neue
+Version)" uebernommen. Aendert sich nur der Name, entsteht dabei **keine** neue Version;
+Vorlagen und Leser sehen das Feld gesperrt. So laesst sich eine Kopie (`Vorlage kopieren`
+erzeugt „… (Kopie)") anschliessend passend benennen.
+
 Filter folgen der pixx.io-API: Verknuepfungen ueber `px.filters.and_(...)`/`or_(...)`
 (`connectorAnd`/`connectorOr`), Negation ueber `px.filters.not_(...)` (`inverted`).
 Metadatenfilter (`metadata_text`, `metadata_selection`, `metadata_date`,
@@ -170,6 +175,9 @@ Namen vor dem Senden auf.
   > zur Obergrenze und meldet, wie viele Felder übrig blieben.
 - Editoren je Typ: Text, Zahl, Datum (`JJJJ-MM-TT HH:MM:SS`), Wahrheitswert,
   Auswahlliste; `map`/`focalpoint`/`orientation` und `std:fileName` sind nur lesbar.
+- Das Grid füllt die verfügbare Fensterhöhe: `.nicegui-content` steht auf `100vh`, das
+  Grid ist ein flexibles Element mit `min-height: 320px`. Die Seite selbst scrollt nicht,
+  gescrollt wird im Grid.
 - Texte werden exakt gespeichert (kein Trimmen). Geänderte Zellen sind grün markiert,
   betroffene Zeilen tragen eine Markierung am linken Rand.
 - Toolbar: Wertfilter auf einer Spalte, „nur geänderte Zeilen", Sortierung auf- und

@@ -33,6 +33,7 @@ from app.scripts.service import (
     publish_version,
     published_version,
     record_run,
+    rename_script,
     save_version,
 )
 from app.scripts.templates import TEMPLATES
@@ -266,7 +267,10 @@ def register_script_pages(
             ).classes("text-xs").style(TEXT_STYLE["warning"])
 
         name_input = ui.input(t("Name"), value=state["script"] or "").props("outlined dense")
-        name_input.set_visibility(script_id == 0)
+        if script_id and (not editable or state["template"]):
+            name_input.props("readonly")
+        if not editable or state["template"]:
+            name_input.tooltip(t("Umbenennen erfordert das Recht zum Bearbeiten von Scripts."))
         editor: Any = None
         code_view: Any = None
         if editable:
@@ -413,6 +417,9 @@ def register_script_pages(
             return f"{t('Filter:')} {outcome.filter} {note}".strip()
 
         def save(publish: bool) -> None:
+            new_name = (name_input.value or "").strip()
+            renamed = bool(script_id) and new_name != (state["script"] or "")
+            source_changed = current_source() != state["source"]
             try:
                 with session_scope(session_factory) as session:
                     actor = session.get(AppUser, user.id)
@@ -421,7 +428,7 @@ def register_script_pages(
                     if script_id == 0:
                         script = create_script(
                             session,
-                            name=name_input.value or "",
+                            name=new_name,
                             source=current_source(),
                             actor=actor,
                             publish=publish,
@@ -434,17 +441,28 @@ def register_script_pages(
                         script = session.get(QueryScript, script_id)
                         if script is None:
                             raise ScriptError("Das Script wurde nicht gefunden.")
-                        version = save_version(
-                            session, script, current_source(), actor=actor, publish=publish
-                        )
+                        if renamed:
+                            rename_script(session, script, new_name, actor=actor)
                         new_id = script.id
-                        message = t("Version v{version} gespeichert.", version=version.version_no)
+                        if not source_changed and not publish:
+                            # reine Umbenennung: keine neue Version anlegen
+                            version = None
+                            message = t("Script heißt jetzt '{name}'.", name=script.name)
+                        else:
+                            version = save_version(
+                                session, script, current_source(), actor=actor, publish=publish
+                            )
+                            message = t(
+                                "Version v{version} gespeichert.", version=version.version_no
+                            )
             except ScriptError as exc:
                 status.set_text(t("Fehler: {message}", message=describe_error(exc)))
                 return
             status.set_text(message + (" " + t("(veröffentlicht)") if publish else ""))
             if script_id == 0:
                 ui.navigate.to(f"/scripts/{new_id}")
+            elif renamed:
+                ui.navigate.reload()
 
         def publish_current() -> None:
             try:
@@ -467,7 +485,7 @@ def register_script_pages(
             action_button("rule", t("Prüfen"), check)
             action_button("play_arrow", t("Dry Run"), dry_run)
             if editable:
-                action_button("save", t("Speichern (neue Version)"), lambda: save(False))
+                action_button("save", t("Speichern (Name und neue Version)"), lambda: save(False))
                 action_button("publish", t("Speichern und veröffentlichen"), lambda: save(True))
                 if script_id:
                     action_button(

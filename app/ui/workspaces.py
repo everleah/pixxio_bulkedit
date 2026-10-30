@@ -86,9 +86,18 @@ EDITABLE_EDIT_TYPES = frozenset(
 
 GRID_HEAD = f"""
 <style>
+  body .q-page {{
+    padding: 0;
+  }}
+  body .nicegui-content {{
+    height: 100vh;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    gap: 0.5rem;
+  }}
   body .ws-grid {{
     flex: 1 1 0;
-    min-height: 520px;
+    min-height: 320px;
     --ag-foreground-color: {PALETTE.text};
     --ag-background-color: #ffffff;
     --ag-header-background-color: {PALETTE.page_background};

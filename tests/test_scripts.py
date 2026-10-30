@@ -45,6 +45,7 @@ from app.scripts.service import (
     latest_version,
     publish_version,
     record_run,
+    rename_script,
     save_version,
 )
 
@@ -376,6 +377,40 @@ def test_doppelter_scriptname_wird_abgelehnt(session: Session, editor: AppUser) 
     create_script(session, name="Doppelt", source=source, actor=editor)
     with pytest.raises(ScriptContractError, match="existiert bereits"):
         create_script(session, name="Doppelt", source=source, actor=editor)
+
+
+def test_script_wird_umbenannt(session: Session, editor: AppUser) -> None:
+    source = "def query(px, params):\n    return [1]\n"
+    script = create_script(session, name="Collection (Kopie)", source=source, actor=editor)
+    version_id = script.current_version_id
+    renamed = rename_script(session, script, "  Meine Auswahl  ", actor=editor)
+    assert renamed == "Meine Auswahl"
+    assert script.name == "Meine Auswahl"
+    assert script.current_version_id == version_id
+    current = latest_version(session, script)
+    assert current is not None and current.version_no == 1  # keine neue Version
+    assert rename_script(session, script, "Meine Auswahl", actor=editor) == "Meine Auswahl"
+
+
+def test_umbenennen_prueft_name_und_rechte(session: Session, editor: AppUser) -> None:
+    source = "def query(px, params):\n    return [1]\n"
+    first = create_script(session, name="Erstes", source=source, actor=editor)
+    create_script(session, name="Zweites", source=source, actor=editor)
+    with pytest.raises(ScriptContractError, match="darf nicht leer"):
+        rename_script(session, first, "   ", actor=editor)
+    with pytest.raises(ScriptContractError, match="existiert bereits"):
+        rename_script(session, first, "Zweites", actor=editor)
+    viewer = create_user(session, username="leser-rename", password="noch-ein-langes-passwort")
+    with pytest.raises(ScriptPermissionError):
+        rename_script(session, first, "Verboten", actor=viewer)
+
+
+def test_vorlage_kann_nicht_umbenannt_werden(session: Session, editor: AppUser) -> None:
+    ensure_templates(session, owner=editor)
+    template = session.scalar(select(QueryScript).where(QueryScript.is_template.is_(True)))
+    assert template is not None
+    with pytest.raises(ScriptPermissionError, match="Vorlagen"):
+        rename_script(session, template, "Eigene Vorlage", actor=editor)
 
 
 def test_vorlagen_werden_angelegt_und_sind_unveraenderlich(

@@ -283,6 +283,8 @@ verpflichtend; das verbleibende Risiko wird dokumentiert.
 ### Script-System
 
 - Editor, unveraenderliche Versionen und Veroeffentlichung.
+- Namen im Editor aendern (auch fuer Kopien von Vorlagen); reines Umbenennen erzeugt
+  keine neue Version, Vorlagen bleiben gesperrt.
 - Nur Superuser duerfen erstellen, aendern oder unveroeffentlichte Entwuerfe testen.
 - Andere Benutzer fuehren ausschliesslich veroeffentlichte Versionen aus.
 - Lesende Fassade mit validierten Ergebnissen.

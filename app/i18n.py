@@ -21,6 +21,10 @@ LOCALE_STORAGE_KEY = "locale"
 
 # Englische Übersetzungen; Schlüssel ist der deutsche Quelltext.
 EN_TRANSLATIONS: dict[str, str] = {
+    # Script umbenennen
+    "Script heißt jetzt '{name}'.": "Script is now called '{name}'.",
+    "Speichern (Name und neue Version)": "Save (name and new version)",
+    "Umbenennen erfordert das Recht zum Bearbeiten von Scripts.": "Renaming requires permission to edit scripts.",
     # Spaltenauswahl: Filter und Zähler
     "Felder filtern": "Filter fields",
     "Höchstens {limit} Spalten; {skipped} Felder wurden nicht ausgewählt.": "At most {limit} columns; {skipped} fields were not selected.",
@@ -216,7 +220,6 @@ EN_TRANSLATIONS: dict[str, str] = {
     "Prüfen": "Validate",
     "Dry Run": "Dry run",
     "Dry Run: ": "Dry run: ",
-    "Speichern (neue Version)": "Save (new version)",
     "Speichern und veröffentlichen": "Save and publish",
     "Aktuelle Version veröffentlichen": "Publish current version",
     "Version laden": "Load version",

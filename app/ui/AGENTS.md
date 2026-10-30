@@ -21,7 +21,9 @@
   Formular fuer Anlegen und Bearbeiten.
 - `scripts.py`: `register_script_pages` registriert `/scripts` (Liste, Vorlagen kopieren)
   und `/scripts/{script_id}` (Editor mit `ui.codemirror`, Parameterformular aus `PARAMS`,
-  Pruefen, Dry Run, Speichern, Veroeffentlichen; `script_id = 0` legt neu an).
+  Pruefen, Dry Run, Speichern, Veroeffentlichen; `script_id = 0` legt neu an). Das
+  Namensfeld ist immer sichtbar und nur fuer Vorlagen und Benutzer ohne Script-Recht
+  gesperrt; "Speichern" uebernimmt einen neuen Namen auch ohne Aenderung am Quelltext.
 - `workspaces.py`: `register_workspace_pages` registriert `/workspaces` (Laden aus einem
   veroeffentlichten Script, Excel-Import, Liste offener Entwuerfe) und `/workspaces/{id}`
   (AG Grid mit Infinite Row Model). Daten liefern `GET /workspace/rows` (effektiver Stand,
@@ -64,6 +66,9 @@
 - Zellhervorhebung und Zeilenmarkierung laufen ueber AG-Grid-Ausdruecke
   (`cellClassRules`, `rowClassRules`) mit `!!data && ...`, weil AG Grid die Regeln auch
   fuer noch nicht geladene Zeilen auswertet.
+- Das Grid fuellt die Fensterhoehe wie im Prototyp: `GRID_HEAD` setzt `.q-page` ohne
+  Padding, `.nicegui-content` auf `height: 100vh` (Box-Sizing, Gap 0.5rem) und `.ws-grid`
+  auf `flex: 1 1 0` mit `min-height: 320px`; gescrollt wird im Grid, nicht auf der Seite.
 - Nach jeder Aenderung: `/workspace/changes` neu laden, `purgeInfiniteCache` ausfuehren und
   den Statustext (Zeilen, Aenderungen, Revision) neu setzen.
 - Die Review-Seite arbeitet ausschliesslich ueber `app/writer.py` und `app/writeplan.py`;
