@@ -202,12 +202,54 @@ Mit synthetischen beziehungsweise bereinigten Testdaten:
 
 Nicht unterstuetzte Filter werden sichtbar abgelehnt, niemals still ignoriert.
 
+**Ergebnis 30.10.2026** (`python -m app.bench.grid`, 50.000 Assets, 30 Metadatenspalten,
+lokaler Rechner, AG Grid Community mit Infinite Row Model und 100 Zeilen je Block):
+
+| Messung | Wert | Ziel |
+|---|---|---|
+| Erster Tabellenblock ab Navigation | 0,43 s | <= 5 s |
+| Filter mit 5.555 Treffern | 0,39 s | <= 5 s |
+| Filter plus Sortierung nach Zahlfeld | 0,44 s | <= 5 s |
+| Blockabruf mit Sortierung, p95 aus 20 Abrufen | 0,25 s | <= 5 s |
+
+Bewertung: Die Anbindung funktioniert mit der Community-Version; das Infinite Row
+Model laedt Bloecke ueber einen HTTP-Endpunkt, Filter und Sortierung laufen serverseitig
+auf dem effektiven Stand. Die Ziele werden deutlich erreicht.
+
+Einschraenkungen: ein Client, keine Vorschaubilder, keine fuenf gleichzeitigen Benutzer,
+Filter nur auf einer Textspalte und synthetische Werte. Aenderungen ausserhalb des
+sichtbaren Blocks und Massenaktionen bleiben offen, weil sie Phase 3 voraussetzen.
+
 ### 6.3 Datenbank-Prototyp
 
 - Snapshot-Speicherung und Wiederherstellung.
 - Abfragen auf effektiven Feldwerten.
 - Gleichzeitige Entwurfsaenderungen und Audit-Schreibvorgaenge.
 - Speicherbedarf, Datenbankwachstum und Sperrverhalten.
+
+**Ergebnis 30.10.2026** (`python -m app.bench --assets 50000 --fields 30`, Windows,
+SQLite mit WAL, synthetische Werte):
+
+| Messung | Wert | Ziel |
+|---|---|---|
+| Snapshot schreiben (50.000 Zeilen) | 2,33 s (21.500 Zeilen/s) | - |
+| Erster Block (100 Zeilen) | 0,05 s | <= 5 s |
+| Block 1.000 ab Zeile 25.000 | 0,14 s | <= 5 s |
+| Filter auf Textfeld im effektiven Stand | 0,17 s | <= 5 s |
+| Bereichsfilter plus Sortierung | 0,19 s | <= 5 s |
+| Nebenlaeufiges Lesen p95 bei 4.203 parallelen Commits | 0,20 s, keine Sperrfehler | <= 5 s |
+| Audit-Schreiben (50.000 Zeilen) | 0,33 s (152.000 Zeilen/s) | - |
+| Datenbankgroesse | 108 MB, 2,27 kB je Asset | - |
+
+Bewertung: SQLite traegt die vereinbarten Ziele im Prototyp mit grossem Abstand;
+eine Architekturaenderung ist nicht begruendet. Der effektive Wert ist als
+`CASE WHEN change.id IS NOT NULL THEN change.new_value ELSE json_extract(...) END`
+modelliert, damit ein geleerter Wert nicht auf den Snapshot zurueckfaellt.
+
+Einschraenkungen der Messung: synthetische Wertgroessen, keine JSON-Ausdrucksindizes,
+WAL in der Groesse enthalten und ein Nebenlaeufigkeitsfenster von zwei Sekunden.
+Speicherbedarf und Wachstum mit echten Werten und ueber 90 Tage Audit bleiben zu
+messen.
 
 ### Abschlusskriterium
 

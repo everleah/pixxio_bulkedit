@@ -24,6 +24,10 @@
   `ledger.py` fuehrt selbst angelegte Test-Assets, `guard.py` setzt die Schutzgrenze,
   `fixtures.py` erzeugt lokale PNG-Testdateien, `probe.py` enthaelt Anlage, Schreibpruefungen
   und Aufraeumen.
+- `bench/`: Datenbank- und Grid-Lastnachweis der Phase 1. `synthetic.py` erzeugt
+  deterministische Assets, `queries.py` haelt die SQL-Abfragen auf dem effektiven Stand,
+  `runner.py` misst Datenbankverhalten, `grid.py` stellt den Grid-Prototyp unter `/bench`
+  bereit, `cli.py` berichtet.
 - `main.py`: NiceGUI-Start, Anmeldung und Session-Ablauf.
 - `alembic.ini` und `migrations/`: root-owned; Schemaaenderungen laufen ausschliesslich
   ueber Alembic-Revisionen.
@@ -32,6 +36,11 @@
 
 - Neue Spalten oder Tabellen nur als Alembic-Revision; `test_migrationen_passen_zu_modellen`
   und `alembic check` muessen ohne Diff bleiben.
+- Werte im effektiven Stand immer als `CASE WHEN change.id IS NOT NULL THEN change.new_value
+  ELSE json_extract(...) END` ausdruecken; `COALESCE` wuerde geleerte Werte falsch aufloesen.
+- `app/bench/` arbeitet offline auf synthetischen Daten und nie auf der Anwendungsdatenbank.
+- Die Prototyp-Route `/bench` und `/bench/rows` gehoert nur zum Lastnachweis; Fachseiten
+  entstehen getrennt davon.
 - API-Keys liegen ausschliesslich verschluesselt in `profile.api_key_enc` und nie in
   Logs, Fehlermeldungen, Sessions oder im Browser.
 - Berechtigungen werden serverseitig je Aktion geprueft; UI-Ausblendungen ersetzen das nicht.

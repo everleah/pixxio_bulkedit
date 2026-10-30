@@ -17,6 +17,8 @@
   arbeiten auf nachgebauten Antwortobjekten.
 - `test_spike_write.py`: Ledger, Schutzgrenze, PNG-Testdateien, Payload-Aufbau und
   CLI-Abbrueche des Schreibpfads; ebenfalls ohne Netzzugriff.
+- `test_bench.py`: synthetische Daten, SQL auf dem effektiven Stand (Aenderung gewinnt,
+  Leeren faellt nicht auf den Snapshot zurueck) und ein kleiner Lastnachweis.
 
 ## Local Contracts
 

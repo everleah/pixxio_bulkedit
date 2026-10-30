@@ -130,6 +130,32 @@ Ledger-Assets und verifiziert die Loeschung ueber die Collection. Ohne
 `PXTEST_IS_DEV=true` werden Anlegen, Schreiben und Loeschen verweigert.
 `data/` ist von Git ausgeschlossen.
 
+## Datenbank-Lastnachweis (Phase 1.6.3)
+
+```powershell
+.\.venv\Scripts\python.exe -m app.bench --assets 50000 --fields 30
+.\.venv\Scripts\python.exe -m app.bench --assets 50000 --fields 30 --json
+```
+
+Der Nachweis laeuft vollstaendig offline auf synthetischen Daten und schreibt eine
+temporaere SQLite-Datei mit den Produktionsmodellen. Gemessen werden Snapshot-Aufbau,
+erster Tabellenblock, Blockabruf, Filter und Sortierung im effektiven Stand,
+nebenlaeufiges Lesen waehrend paralleler Aenderungen, Audit-Inserts sowie Groesse und
+Wachstum. `--db-path` behaelt die Datei, `--keep` die temporaere. Die Messwerte sind im
+[Umsetzungsplan](plan/implementation_plan.md) dokumentiert.
+
+## Grid-Lastnachweis (Phase 1.6.2)
+
+```powershell
+.\.venv\Scripts\python.exe -m app.bench.grid --assets 50000 --fields 30 --port 8200
+```
+
+Startet einen Prototyp unter `http://127.0.0.1:8200/bench`: AG Grid Community mit
+Infinite Row Model, Blockabruf ueber `/bench/rows`, serverseitiger Filter und
+serverseitige Sortierung auf dem effektiven Stand. Der erste Start legt die
+Datenbank unter `%TEMP%` an; weitere Starts verwenden sie wieder. Die Route ist nur
+Teil des Lastnachweises, nicht der Anwendung.
+
 ## Code-Quality-Gates
 
 Die empfohlenen VS-Code-Erweiterungen sind Python, Pylance und Ruff.

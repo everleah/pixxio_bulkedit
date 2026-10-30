@@ -32,16 +32,21 @@ def _apply_sqlite_pragmas(dbapi_connection: sqlite3.Connection, _record: object)
         cursor.close()
 
 
-def create_engine_for(settings: Settings) -> Engine:
-    """Erzeugt eine Engine mit aktivierten Fremdschluesseln und WAL-Journal."""
-    settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+def create_sqlite_engine(db_path: Path) -> Engine:
+    """SQLite-Engine mit Fremdschluesseln, WAL-Journal und Wartezeit."""
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(
-        settings.database_url,
+        f"sqlite:///{db_path.as_posix()}",
         connect_args={"check_same_thread": False, "timeout": 15.0},
         future=True,
     )
     event.listen(engine, "connect", _apply_sqlite_pragmas)
     return engine
+
+
+def create_engine_for(settings: Settings) -> Engine:
+    """Erzeugt eine Engine fuer den konfigurierten Datenbankpfad."""
+    return create_sqlite_engine(settings.db_path)
 
 
 def create_session_factory(engine: Engine) -> SessionFactory:
