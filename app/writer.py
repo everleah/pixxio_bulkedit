@@ -588,21 +588,20 @@ def reconcile(
     *,
     preview: PlanPreview | None = None,
 ) -> WriteReport:
-    """Nach einem Neustart bekannte Schritte prüfen, ohne erneut zu senden."""
+    """Nach einem Neustart bekannte Schritte pruefen, ohne erneut zu senden."""
     workspace = session.get(Workspace, plan.workspace_id) if plan.workspace_id else None
-    report = WriteReport(mode=plan.mode, status=RunStatus.RUNNING, conflicts=[])
     if workspace is None:
         raise WriteError(t("Der Arbeitsbestand zum Plan fehlt."))
     changes = preview.changes if preview is not None else []
+    expected_preview = _preview_from_plan(plan, changes)
+    rows = _plan_log_rows(session, plan)
+    run = _plan_run(session, plan)
+    mode = run.mode if run is not None else plan.mode
+    report = WriteReport(mode=mode, status=RunStatus.RUNNING, conflicts=[])
     for step in plan_steps(session, plan):
         ids = tuple(int(value) for value in json.loads(step.ids_json))
         item = StepReport(step_no=step.step_no, status=step.status, ids=ids, job_id=step.job_id)
-        if step.status in {StepStatus.OK, StepStatus.FAILED, StepStatus.SKIPPED} and not ids:
-            report.steps.append(item)
-            continue
-        checked = _compare(
-            _expected(_preview_from_plan(plan, changes), ids), read_files(client, columns, ids)
-        )
+        checked = _compare(_expected(expected_preview, ids), read_files(client, columns, ids))
         item.checked = len(checked)
         item.mismatched = sum(1 for ok in checked.values() if not ok)
         if checked and item.mismatched == 0:
@@ -615,10 +614,76 @@ def reconcile(
         step.status = item.status
         step.error = item.error
         step.finished_at = utc_now()
+        step.verification_json = json.dumps(
+            {
+                "checked": item.checked,
+                "mismatched": item.mismatched,
+                "applied": sorted(
+                    f"{file_id}:{key}" for (file_id, key), ok in checked.items() if ok
+                ),
+                "reconciled": True,
+            },
+            ensure_ascii=False,
+        )
+        for row in _step_rows(rows, ids):
+            field_ok = checked.get((row.file_id, row.field_key))
+            row.status = (
+                _change_status(item.status)
+                if field_ok is None
+                else ChangeStatus.OK
+                if field_ok
+                else _change_status(item.status)
+            )
+            row.error = item.error
         report.steps.append(item)
+
     report.status = _final_status(report)
     plan.status = _plan_status(report.status)
+    if run is not None and run.status is RunStatus.RUNNING:
+        run.status = report.status
+        run.finished_at = utc_now()
+        report.run_id = run.id
+    if report.status is RunStatus.OK:
+        applied = [
+            (row.file_id, row.field_key)
+            for file_rows in rows.values()
+            for row in file_rows
+            if row.status is ChangeStatus.OK
+        ]
+        if applied:
+            current = read_files(client, columns, {file_id for file_id, _key in applied})
+            report.committed = commit_applied(
+                session,
+                workspace,
+                applied,
+                values={file_id: item["values"] for file_id, item in current.items()},
+                modify_dates={file_id: item["modifyDate"] for file_id, item in current.items()},
+            )
+    if run is not None:
+        run.stats_json = json.dumps(_stats(report), ensure_ascii=False)
+    session.flush()
     return report
+
+
+def _plan_run(session: Session, plan: WritePlan) -> Run | None:
+    """Der Live-Lauf zu einem Plan (auch ein abgebrochener)."""
+    return session.scalars(
+        select(Run)
+        .where(Run.write_plan_id == plan.id, Run.mode == RunMode.LIVE)
+        .order_by(Run.id.desc())
+        .limit(1)
+    ).first()
+
+
+def _plan_log_rows(session: Session, plan: WritePlan) -> dict[int, list[ChangeLog]]:
+    """Change-Log-Eintraege aller Laeufe eines Plans, nach Datei gruppiert."""
+    rows: dict[int, list[ChangeLog]] = {}
+    statements = (
+        select(ChangeLog).join(Run, Run.id == ChangeLog.run_id).where(Run.write_plan_id == plan.id)
+    )
+    for row in session.scalars(statements):
+        rows.setdefault(int(row.file_id), []).append(row)
+    return rows
 
 
 def _preview_from_plan(plan: WritePlan, changes: Sequence[PlannedChange]) -> PlanPreview:
@@ -630,8 +695,8 @@ def _preview_from_plan(plan: WritePlan, changes: Sequence[PlannedChange]) -> Pla
             file_id=int(item["file_id"]),
             key=str(item["key"]),
             label=str(item.get("label") or item["key"]),
-            old_value=item.get("old"),
-            new_value=item.get("new"),
+            old_value=item.get("old_value", item.get("old")),
+            new_value=item.get("new_value", item.get("new")),
         )
         for item in stored.get("changes", [])
     ]

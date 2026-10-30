@@ -363,6 +363,8 @@ def save_plan(
                         "label": change.label,
                         "old": change.old_display,
                         "new": change.new_display,
+                        "old_value": change.old_value,
+                        "new_value": change.new_value,
                     }
                     for change in preview.changes
                 ],

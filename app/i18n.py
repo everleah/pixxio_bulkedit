@@ -253,6 +253,11 @@ EN_TRANSLATIONS: dict[str, str] = {
         "ok {ok} | planned {planned} | unclear {unknown} | failed {failed} | skipped {skipped}"
     ),
     "Undo zu Lauf {run}": "Undo of run {run}",
+    "Status abgleichen": "Reconcile status",
+    "Es gibt keinen Plan zum Prüfen.": "There is no plan to check.",
+    "Status abgeglichen: {status} ({count} Änderungen übernommen).": (
+        "Status reconciled: {status} ({count} changes committed)."
+    ),
     "Kommentar zum Statuswechsel": "Comment for the state change",
     "Ein Statuswechsel verlangt einen Kommentar ({field}).": (
         "A state change requires a comment ({field})."

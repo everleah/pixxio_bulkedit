@@ -211,6 +211,9 @@ Status und Fehlertext.
   dieselbe Review- und Schreibpipeline. Kein atomarer Rollback.
 - Feldwerte älter als 90 Tage werden entfernt (`python -m app purge-history` oder die
   Schaltfläche in `/runs`); die kompakte Laufübersicht bleibt erhalten.
+- „Status abgleichen“ bei Läufen, die nicht sauber mit `ok` endeten: Der Writer liest die
+  betroffenen Dateien zurück und entscheidet neu — bestätigte Werte gelten als Erfolg und
+  werden aus dem Entwurf gebucht, unklare bleiben unklar. Es wird nie erneut gesendet.
 
 ## Oberfläche und Sprache
 

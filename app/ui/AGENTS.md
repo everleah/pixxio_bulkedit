@@ -78,6 +78,9 @@
 - `/runs/{id}` zeigt je Feld Alt-/Neu-Wert und Status; `Undo vorbereiten` springt nach
   Erfolg direkt in die Review-Seite des neuen Undo-Arbeitsbestands. Bei nur teilweise
   wirksamen Laeufen erscheint ein Hinweis, dass nur wirksame Felder zurueckgenommen werden.
+- `Status abgleichen` erscheint bei Live-Laeufen, die nicht `ok` sind, und ruft
+  `app/writer.reconcile` auf: Ruecklesung statt erneutem Senden, danach Neuladen der Seite.
+  Ein Undo eines Statuswechsels verlangt in der Review-Seite ebenfalls einen Kommentar.
 
 ## Work Guidance
 

@@ -12,8 +12,8 @@ from nicegui import run, ui
 from app.clients import ClientFactory
 from app.db import SessionFactory, session_scope
 from app.i18n import describe_error, t
-from app.models import AppUser, Profile, Run
-from app.models.enums import RunStatus
+from app.models import AppUser, Profile, Run, WritePlan
+from app.models.enums import RunMode, RunStatus
 from app.runs import (
     RunSummary,
     describe_change,
@@ -26,6 +26,7 @@ from app.schema import SchemaCache
 from app.ui.guard import current_user, redirect_to_login
 from app.ui.shell import apply_locale, apply_palette, page_header
 from app.ui.widgets import action_button
+from app.writer import reconcile
 
 LIST_ROUTE = "/runs"
 
@@ -127,6 +128,10 @@ def register_run_pages(
                 f"{stored.started_at:%d.%m.%Y %H:%M}"
             )
             status = stored.status
+            plan_id = stored.write_plan_id
+            needs_check = (
+                plan_id is not None and stored.mode is RunMode.LIVE and status is not RunStatus.OK
+            )
 
         page_header(t("Lauf {run}", run=run_id), user)
         ui.label(header).classes("text-sm")
@@ -195,9 +200,47 @@ def register_run_pages(
             )
             ui.navigate.to(f"/workspaces/{workspace_id}/review")
 
+        def reconcile_job() -> tuple[str, int]:
+            with session_scope(session_factory) as session:
+                stored_run = session.get(Run, run_id)
+                if stored_run is None or stored_run.write_plan_id is None:
+                    raise ValueError(t("Der Lauf wurde nicht gefunden."))
+                plan = session.get(WritePlan, stored_run.write_plan_id)
+                if plan is None or stored_run.profile_id is None:
+                    raise ValueError(t("Der Lauf wurde nicht gefunden."))
+                profile = session.get(Profile, stored_run.profile_id)
+                if profile is None:
+                    raise ValueError(t("Das Profil des Laufs fehlt."))
+                schema = schema_cache.get(profile)
+                report = reconcile(
+                    session, plan, client_factory.client_for(profile), schema.columns()
+                )
+                return report.status.value, report.committed
+
+        async def start_reconcile() -> None:
+            try:
+                outcome = await run.io_bound(reconcile_job)
+            except Exception as exc:  # noqa: BLE001 - Meldung in der Seite
+                ui.notify(describe_error(exc), color="negative")
+                return
+            if outcome is None:
+                return
+            status_value, committed = outcome
+            ui.notify(
+                t(
+                    "Status abgeglichen: {status} ({count} Änderungen übernommen).",
+                    status=status_value,
+                    count=committed,
+                ),
+                color="positive" if status_value == RunStatus.OK.value else "warning",
+            )
+            ui.navigate.reload()
+
         with ui.row().classes("w-full items-center gap-1"):
             if ok_count:
                 action_button("undo", t("Undo vorbereiten"), undo)
+            if needs_check:
+                action_button("sync", t("Status abgleichen"), start_reconcile)
             action_button(
                 "arrow_back", t("Zurück zu den Läufen"), lambda: ui.navigate.to(LIST_ROUTE)
             )

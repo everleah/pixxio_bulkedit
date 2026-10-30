@@ -83,7 +83,10 @@
   Ruecklesung; unklare Ausgaenge werden `StepStatus.UNKNOWN`, nie Erfolg.
 - Ein systematischer Fehler (`Unauthorized`, `Forbidden`) pausiert den Rest des Auftrags:
   verbleibende Schritte werden `skipped`. `reconcile` prueft bekannte Schritte nach einem
-  Neustart ohne erneutes Senden.
+  Neustart ohne erneutes Senden: Ruecklesung entscheidet ueber `ok`/`partial`/`unknown`,
+  der zugehoerige Lauf wird abgeschlossen, `ChangeLog`-Zeilen werden nachgezogen und bei
+  vollstaendigem Erfolg `commit_applied` ausgefuehrt. Der Laufmodus stammt aus dem Lauf,
+  nicht aus dem Plan (ein Absturz laesst den Plan im Zustand `draft`).
 - Nach vollstaendig erfolgreichem Lauf uebernimmt `commit_applied` die geschriebenen Felder
   in den Snapshot und entfernt sie aus dem ChangeSet; `ChangeLog` bleibt als Protokoll.
 - `ChangeStatus` umfasst `planned`, `ok`, `failed`, `skipped`, `skipped_conflict`,

@@ -476,41 +476,60 @@ def test_ruecklesung_liest_aktuelle_werte(fake_client: None) -> None:
     assert read_files(object(), [SUBJECT], [99]) == {}
 
 
+def _crashed_run(
+    session: Session, plan: Any, workspace: Workspace, profile: Profile
+) -> tuple[Run, list[ChangeLog]]:
+    """Zustand nach einem Absturz mitten im Lauf."""
+    run = Run(
+        kind=RunKind.WRITE,
+        mode=RunMode.LIVE,
+        status=RunStatus.RUNNING,
+        workspace_id=workspace.id,
+        profile_id=profile.id,
+        write_plan_id=plan.id,
+    )
+    session.add(run)
+    session.flush()
+    rows = []
+    for item in json.loads(plan.plan_json)["changes"]:
+        row = ChangeLog(
+            run_id=run.id,
+            file_id=int(item["file_id"]),
+            field_key=str(item["key"]),
+            old_value=str(item["old"]),
+            new_value=str(item["new"]),
+            status=ChangeStatus.PLANNED,
+        )
+        session.add(row)
+        rows.append(row)
+    session.flush()
+    return run, rows
+
+
 def test_reconcile_erkennt_uebernommene_schritte(
     session: Session,
     workspace: Workspace,
     schema: ProfileSchema,
     owner: AppUser,
+    profile: Profile,
     fake_client: None,
 ) -> None:
     plan, _preview = _plan(session, workspace, schema, owner)
+    run, rows = _crashed_run(session, plan, workspace, profile)
     for file_id in (1, 2):
         FakeFiles.store[file_id]["subject"] = "Neu"
-    step = plan.steps[0]
-    step.status = StepStatus.RUNNING
+    plan.steps[0].status = StepStatus.RUNNING
     session.flush()
 
     report = reconcile(session, plan, object(), [SUBJECT])
 
     assert report.steps[0].status is StepStatus.OK
     assert report.status is RunStatus.OK
-    assert step.status is StepStatus.OK
+    assert report.run_id == run.id
     assert plan.status is PlanStatus.COMPLETED
-
-
-def test_reconcile_ohne_wirkung_bleibt_unklar(
-    session: Session,
-    workspace: Workspace,
-    schema: ProfileSchema,
-    owner: AppUser,
-    fake_client: None,
-) -> None:
-    plan, _preview = _plan(session, workspace, schema, owner)
-    plan.steps[0].status = StepStatus.RUNNING
-    session.flush()
-
-    report = reconcile(session, plan, object(), [SUBJECT])
-
-    assert report.steps[0].status is StepStatus.UNKNOWN
-    assert report.steps[0].error == "Ausgang nach Neustart unklar. Bitte Werte prüfen."
-    assert plan.status is PlanStatus.FAILED
+    assert report.committed == 2
+    assert changed_count(session, workspace.id) == 0
+    assert snapshot_value(session, workspace.id, 1, "std:subject") == "Neu"
+    assert run.status is RunStatus.OK
+    assert run.finished_at is not None
+    assert {row.status for row in rows} == {ChangeStatus.OK}

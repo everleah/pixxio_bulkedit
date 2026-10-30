@@ -38,7 +38,8 @@
 - `test_writer.py`: Schreiblauf mit nachgebautem Client (`File`/`Job` ersetzt): Dry Run
   ohne Schreiben, Live-Lauf mit Rueckleseverifikation, Buchung in `ChangeLog`/`Run`,
   Sperren bei veraltetem Entwurf und Konflikten, Fehlschlag/unklarer Ausgang/Teilfehler,
-  Pause bei systematischen Fehlern, Ueberschneidungswarnung und `reconcile`.
+  Pause bei systematischen Fehlern, Ueberschneidungswarnung sowie `reconcile`
+  (Laufabschluss, Change-Log-Nachzug, Buchen bei Erfolg, `unknown` ohne Wirkung).
 - `test_runs.py`: Laufuebersicht mit Zaehlern je Status und Namen, Feldhistorie,
   Undo-Vorbereitung (nur `ok`-Felder, Abweichung gegen den geschriebenen Wert,
   fehlende Dateien, kein wirksames Feld) und die Aufbewahrungsgrenze.

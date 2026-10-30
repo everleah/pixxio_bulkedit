@@ -413,8 +413,25 @@ Test-Assets, Bulk-Wert im Grid, Review und Dry Run (Lauf 6), Schreiben (Lauf 7, 
 30293895, Ruecklesung 3/3), externer Konflikt blockiert den Lauf ohne Bestaetigung, mit
 Bestaetigung erfolgreich (Lauf 8), danach 0 Aenderungen im Entwurf.
 
-Offene Punkte: `reconcile` fuer unterbrochene Auftraege ist implementiert, aber nur
-offline getestet.
+Offene Punkte: keine; `reconcile` ist live geprueft (siehe Nachtrag Wiederanlauf).
+
+**Nachtrag Wiederanlauf (30.10.2026):** `reconcile` ist vollstaendig und live geprueft.
+Es liest die betroffenen Dateien zurueck, entscheidet je Schritt ueber
+`ok`/`partial`/`unknown`, schreibt `verification_json` mit `reconciled: true`, zieht die
+`change_log`-Zeilen nach, schliesst den zugehoerigen Lauf ab (Status, `finished_at`,
+Statistik) und bucht bei vollstaendigem Erfolg ueber `commit_applied`. Der Laufmodus kommt
+aus dem Lauf, weil ein Absturz den Plan im Zustand `draft` laesst. Erreichbar ueber
+`/runs/{id}` ("Status abgleichen") bei Live-Laeufen, die nicht `ok` sind. Live geprueft:
+rekonstruierter Absturz nach echtem `filesPut` (Job 30296791, Lauf 13 `running`/`planned`)
+→ Abgleich meldet `ok`, bucht 2 Aenderungen und leert den ChangeSet; ohne wirksamen
+Schreibvorgang (Lauf 14) bleibt es bei `unknown`/`failed`, der Entwurf behaelt die
+Aenderung. Zusaetzlich belegt: ein unklarer Job-Timeout wird schon im Lauf ueber die
+Ruecklesung zu `ok` aufgeloest (Lauf 12).
+
+Ein Undo eines Statuswechsels verlangt ebenfalls einen Kommentar, weil das Undo als neue
+Aenderung an `std:fileStateID` durch dieselbe Pipeline laeuft. Live geprueft: Undo zu Lauf
+10 (Arbeitsbestand 8) fordert den Kommentar an, schreibt mit "Sperre aufgehoben (Undo)"
+(Lauf 15) und setzt den Status zurueck.
 
 **Nachtrag Dateistatus (30.10.2026):** `fileStateChangeComment` ist API-seitig optional;
 auf dem Testsystem greift `fileStateID` ohne Kommentar. Geprueft wurden `fileStateID`
@@ -462,6 +479,13 @@ Hintergrundjobs entspricht die wirksame Reihenfolge nicht zwingend der Klickreih
 
 Browserabbruch, App-Neustart, Timeout, Teilfehler und unbekannter Request-Ausgang sind
 gezielt getestet.
+
+**Umgesetzt (30.10.2026):** Timeout und unbekannter Request-Ausgang werden im Lauf ueber
+die Ruecklesung aufgeloest (Live: Lauf 12). App-Neustart beziehungsweise Absturz wird ueber
+`reconcile` behandelt: Lauf 13 (rekonstruierter Absturz nach echtem `filesPut`) wurde
+abgeglichen, gebucht und abgeschlossen; Lauf 14 ohne Wirkung bleibt `unknown`/`failed`.
+Teilfehler decken die Tests in `tests/test_writer.py` ab (Pause, Teilruecklesung,
+abweichende Ruecklesung).
 
 ## 10. Phase 5 - Audit und Undo
 

@@ -31,6 +31,7 @@ from app.runs import (
 )
 from app.schema import ColumnDef, ProfileSchema
 from app.workspaces import AssetRow, changed_count, create_workspace, store_snapshot
+from app.writeplan import build_preview
 
 SUBJECT = ColumnDef(key="std:subject", label="Titel", source="file_attr", edit_type="text")
 
@@ -309,3 +310,30 @@ def test_anzeigezeile_eines_feldeintrags(
     assert described["new"] == "Neu"
     assert described["status"] == "failed"
     assert described["error"] == "kaputt"
+
+
+def test_undo_eines_statuswechsels_verlangt_kommentar(
+    session: Session,
+    workspace: Workspace,
+    profile: Profile,
+    owner: AppUser,
+    fake_client: None,
+) -> None:
+    schema = ProfileSchema(file_states=((371896184, "neu"), (1872385346, "gesperrt")))
+    FakeFiles.store[1]["fileState"] = {"id": 1872385346}
+    run = _run(session, workspace, profile, owner)
+    _log(session, run, file_id=1, key="std:fileStateID", old="neu", new="gesperrt")
+
+    report = prepare_undo(session, run, schema, FakeFiles(), actor=owner)
+
+    undo_workspace = session.get(Workspace, report.workspace_id)
+    assert undo_workspace is not None
+    preview = build_preview(session, undo_workspace, schema, None)
+    assert preview.requires_comment is True
+    assert preview.errors == ["Ein Statuswechsel verlangt einen Kommentar (fileStateID)."]
+    with_comment = build_preview(session, undo_workspace, schema, None, comment="Sperre aufgehoben")
+    assert with_comment.errors == []
+    assert with_comment.steps[0].payload == {
+        "fileStateID": 371896184,
+        "fileStateChangeComment": "Sperre aufgehoben",
+    }
