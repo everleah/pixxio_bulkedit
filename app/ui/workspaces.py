@@ -101,6 +101,8 @@ MIN_COLUMN_WIDTH = 80
 EDITABLE_EDIT_TYPES = frozenset(
     {"text", "none", "number", "date", "boolean", "selection", "multiselection", "language"}
 )
+# Merker fuer die Spalte, die nach dem Uebernehmen der Auswahl sichtbar geschoben wird.
+SCROLL_HINT_KEY = "grid_scroll_hint"
 
 GRID_HEAD = f"""
 <style>
@@ -269,6 +271,15 @@ def grouped_columns(columns: Sequence[ColumnDef]) -> dict[str, list[ColumnDef]]:
     }
 
 
+def ordered_keys(
+    current: Sequence[str], chosen: set[str], dialog_order: Sequence[str]
+) -> list[str]:
+    """Auswahlreihenfolge: bestehende Spalten bleiben, neue kommen in Dialogreihenfolge dazu."""
+    ordered = [key for key in current if key in chosen]
+    ordered.extend(key for key in dialog_order if key in chosen and key not in ordered)
+    return ordered
+
+
 def workspace_columns(
     schema: ProfileSchema,
     script_columns: Sequence[str] | None,
@@ -314,10 +325,11 @@ def column_def(column: ColumnDef) -> dict[str, Any]:
         },
     }
     if column.edit_type == "number":
-        definition["cellEditor"] = "agNumberCellEditor"
+        definition["cellEditor"] = "agTextCellEditor"
+        definition["headerTooltip"] = t("Zahl, Dezimaltrennzeichen Komma oder Punkt")
     elif column.edit_type == "date":
-        definition["cellEditor"] = "agDateStringCellEditor"
-        definition["headerTooltip"] = t("Format JJJJ-MM-TT HH:MM:SS")
+        definition["cellEditor"] = "agTextCellEditor"
+        definition["headerTooltip"] = t("Datum als JJJJ-MM-TT oder TT.MM.JJJJ, Uhrzeit HH:MM:SS")
     elif column.edit_type == "boolean":
         definition["cellEditor"] = "agCheckboxCellEditor"
     elif column.edit_type == "selection":
@@ -353,6 +365,27 @@ def script_label(session: Any, workspace: Workspace) -> str:
         return ""
     script = session.get(QueryScript, version.script_id)
     return script.name if script is not None else ""
+
+
+def _take_scroll_hint() -> dict[str, Any] | None:
+    """Holt den Merker fuer die neu hinzugefuegte Spalte und loescht ihn."""
+    try:
+        storage = nicegui_app.storage.user
+        hint = storage.get(SCROLL_HINT_KEY)
+        if hint is None:
+            return None
+        del storage[SCROLL_HINT_KEY]
+    except RuntimeError, KeyError:  # pragma: no cover - kein Session-Kontext
+        return None
+    return hint if isinstance(hint, dict) else None
+
+
+def _store_scroll_hint(workspace_id: int, key: str) -> None:
+    """Merkt sich die neu uebernommene Spalte, damit sie nach dem Neuladen sichtbar wird."""
+    try:
+        nicegui_app.storage.user[SCROLL_HINT_KEY] = {"workspace": workspace_id, "key": key}
+    except RuntimeError:  # pragma: no cover - kein Session-Kontext
+        return
 
 
 def _profiles_for(session_factory: SessionFactory, user: AppUser) -> dict[int, str]:
@@ -959,6 +992,12 @@ def register_workspace_pages(
             schema = schema_cache.get(profile)
             columns = view_columns(session, workspace, schema)
 
+        scroll_hint = _take_scroll_hint()
+        focus_key = (
+            str(scroll_hint.get("key") or "")
+            if scroll_hint is not None and scroll_hint.get("workspace") == workspace_id
+            else ""
+        )
         page_header(name, user)
         ui.add_head_html(GRID_HEAD)
         ui.add_head_html(
@@ -1058,11 +1097,16 @@ def register_workspace_pages(
                         checked[column.key] = widget
 
         def _chosen_keys() -> list[str]:
-            return [
+            chosen = {
                 column.key
                 for column in dialog_columns
                 if column.key in checked and checked[column.key].value
-            ]
+            }
+            return ordered_keys(
+                [column.key for column in columns],
+                chosen,
+                [column.key for column in dialog_columns],
+            )
 
         def _refresh_counter() -> None:
             if built["bulk"] or not built["done"]:
@@ -1154,6 +1198,8 @@ def register_workspace_pages(
 
         async def _apply_columns() -> None:
             keys = _chosen_keys()
+            known_visible = {column.key for column in columns}
+            added = [key for key in keys if key not in known_visible]
             with session_scope(session_factory) as session:
                 current = session.get(Workspace, workspace_id)
                 if current is None:
@@ -1170,6 +1216,8 @@ def register_workspace_pages(
             ui.notify(t("{count} Spalten übernommen.", count=len(stored)))
             if profile_row is not None:
                 await _load_missing(profile_row, wanted)
+            if added:
+                _store_scroll_hint(workspace_id, added[0])
             ui.navigate.reload()
 
         def _reset_columns() -> None:
@@ -1351,7 +1399,6 @@ def register_workspace_pages(
                     )
                 except WorkspaceConflictError as exc:
                     ui.notify(str(exc), color="negative")
-                    return
                 except (ScriptError, WorkspaceError) as exc:
                     ui.notify(str(exc), color="negative")
                 else:
@@ -1528,7 +1575,17 @@ def register_workspace_pages(
 
         filter_input.on("keydown.enter", lambda _: apply_filter_now())
         only_changed_switch.on_value_change(lambda _: apply_filter_now())
-        grid.on("gridReady", reload_changes_and_grid, args=[])
+
+        async def after_grid_ready() -> None:
+            await reload_changes_and_grid()
+            if not focus_key:
+                return
+            try:
+                await grid.run_grid_method("ensureColumnVisible", focus_key)
+            except Exception:  # noqa: BLE001 - reine Anzeigehilfe
+                pass
+
+        grid.on("gridReady", after_grid_ready, args=[])
 
 
 def _expiry_text(workspace: Workspace) -> str:
@@ -1540,6 +1597,7 @@ def _expiry_text(workspace: Workspace) -> str:
 
 __all__ = [
     "column_def",
+    "ordered_keys",
     "owned_workspace",
     "register_workspace_pages",
     "script_column_keys",

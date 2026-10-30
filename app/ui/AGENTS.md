@@ -42,6 +42,10 @@
 
 - Jede Seite ruft `current_user` selbst auf; ohne Session wird auf `/` umgeleitet, ohne
   Superuser-Rolle erscheint "Kein Zugriff" und die Seite baut keine Daten auf.
+- `apply_locale()` injiziert zusaetzlich `CONNECTION_GUARD`: ein Banner "Verbindung
+  unterbrochen - bitte die Seite neu laden.", das bei `socket.io`-Disconnect erscheint.
+  Ohne Verbindung nimmt der Server keine Zelländerung an, und die Zelle springt beim
+  Neuladen zurueck — das Banner verhindert die Verwechslung mit einem Datenfehler.
 - Der API-Key ist write-only: Das Passwortfeld startet immer leer, ein leerer Wert laesst
   den gespeicherten Key stehen, und der Key erscheint nie in Labels, Logs oder im Browser.
 - Nach jeder Aenderung an einem Profil wird `ClientFactory.invalidate` aufgerufen, damit
@@ -125,12 +129,23 @@
   "Uebernehmen" ruft `store_columns` und laedt die Seite neu (`ui.navigate.reload`),
   "Zuruecksetzen" ruft `clear_columns`.
 - `grouped_columns` sortiert je Gruppe nach Anzeigename (`column_sort_key`: Umlaute
-  zaehlen wie ihr Grundbuchstabe, danach `casefold`). Die gespeicherte Reihenfolge ist die
-  Reihenfolge im Dialog, damit Grid und Excel-Export dieselbe Sortierung zeigen.
+  zaehlen wie ihr Grundbuchstabe, danach `casefold`). `ordered_keys` bildet die
+  Reihenfolge der Auswahl: bereits sichtbare Spalten behalten ihre Position, neue kommen
+  in Dialogreihenfolge hinten dazu. So verschiebt "Uebernehmen" keine bestehende Ansicht,
+  und Grid und Excel-Export zeigen dieselbe Reihenfolge.
 - Nach "Uebernehmen" laedt die Seite Werte fuer Spalten nach, die noch nicht im Snapshot
   stehen (`missing_columns` + `read_files` in `run.io_bound`, dann
   `merge_snapshot_values`), und laedt erst danach neu. Ohne diesen Schritt blieben neue
-  Spalten leer und Bearbeitungen darin unsichtbar.
+  Spalten leer und Bearbeitungen darin unsichtbar. Die erste neu hinzugekommene Spalte
+  merkt sich `_store_scroll_hint` in der Session; `after_grid_ready` scrollt sie mit
+  `ensureColumnVisible` ins Bild, weil sie sonst ausserhalb des sichtbaren Bereichs liegt.
+- Zahl- und Datumsspalten nutzen `agTextCellEditor` (kein `agNumberCellEditor` bzw.
+  `agDateStringCellEditor`): Die Zahleneingabe verwirft Kommas, die Datumseingabe
+  akzeptiert nur die Reihenfolge des Browsers — in beiden Faellen leert ein Tippen die
+  Zelle ohne Fehlermeldung. Der Tooltip nennt die erlaubten Formate.
+- Nach einer abgelehnten Zellaenderung (Konflikt oder ungueltiger Wert) laeuft
+  `reload_changes_and_grid` trotzdem: Die Zelle zeigt wieder den gespeicherten Wert statt
+  einer Eingabe, die nie gespeichert wurde.
 
 ## Work Guidance
 
@@ -157,8 +172,11 @@
   sichtbar. Mit einer extern geaenderten Datei muss der Lauf ohne Bestaetigung blockieren.
 - Spaltenauswahl: "Spalten auswaehlen" oeffnen, Feldfilter nutzen, "Alle"/"Keine",
   "Uebernehmen" und "Zuruecksetzen" pruefen; das Grid zeigt danach genau die gewaehlten
-  Spalten (in der Reihenfolge des Dialogs, je Gruppe alphabetisch), und die Auswahl
-  ueberlebt ein Neuladen der Seite.
+  Spalten, bereits sichtbare an ihrer Position und neue hinten (die erste neue wird
+  sichtbar gescrollt); die Auswahl ueberlebt ein Neuladen der Seite.
+- Zelleditoren je Typ pruefen: Text, Zahl mit Komma ("1,5"), Datum als "31.12.2026"
+  (erscheint als "2026-12-31 00:00:00") und als "morgen" (Fehlermeldung, Zelle behaelt
+  den gespeicherten Wert), Auswahlliste mit gefuellten Optionen.
 - Excel: im Grid exportieren, in der Arbeitsmappe eine Zelle aendern, ueber `/workspaces`
   importieren; der neue Arbeitsbestand zeigt genau diese Aenderung, und die Review-Seite
   schreibt sie mit `run.source = xlsx`.

@@ -24,13 +24,60 @@ def apply_palette() -> None:
     ui.add_head_html(FOCUS_CSS)
 
 
+# Hinweisbanner, wenn die WebSocket-Verbindung abreisst: Ohne Verbindung nimmt der
+# Server keine Zelländerung mehr an, und die Zelle springt beim Neuladen zurück.
+CONNECTION_GUARD = """
+<style>
+  #ws-offline {{
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    right: 0;
+    top: 0;
+    padding: 0.4rem 0.8rem;
+    background: #b45309;
+    color: #ffffff;
+    text-align: center;
+    font-size: 0.9rem;
+  }}
+</style>
+<div id="ws-offline">{text}</div>
+<script>
+  (function () {{
+    function banner(show) {{
+      const element = document.getElementById('ws-offline');
+      if (element) {{ element.style.display = show ? 'block' : 'none'; }}
+    }}
+    function attach() {{
+      const socket = window.socket;
+      if (!socket) {{ return false; }}
+      if (socket.__wsGuard) {{ return true; }}
+      socket.__wsGuard = true;
+      socket.on('disconnect', () => banner(true));
+      socket.on('connect', () => banner(false));
+      if (socket.connected === false) {{ banner(true); }}
+      return true;
+    }}
+    if (!attach()) {{
+      const timer = setInterval(() => {{ if (attach()) {{ clearInterval(timer); }} }}, 500);
+    }}
+  }})();
+</script>
+"""
+
+
 def apply_locale() -> str:
     """Sprache aus der Session übernehmen (Standard: Deutsch)."""
     try:
         stored = app.storage.user.get(LOCALE_STORAGE_KEY)
     except RuntimeError:  # pragma: no cover - kein Session-Kontext
         stored = None
-    return set_locale(stored)
+    locale = set_locale(stored)
+    ui.add_head_html(
+        CONNECTION_GUARD.format(text=t("Verbindung unterbrochen – bitte die Seite neu laden."))
+    )
+    return locale
 
 
 def store_locale(locale: str) -> None:

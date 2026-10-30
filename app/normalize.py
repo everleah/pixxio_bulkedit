@@ -19,6 +19,9 @@ DATE_INPUT_FORMATS = (
     "%Y-%m-%d %H:%M",
     "%Y-%m-%dT%H:%M",
     "%Y-%m-%d",
+    "%d.%m.%Y %H:%M:%S",
+    "%d.%m.%Y %H:%M",
+    "%d.%m.%Y",
 )
 TRUE_WORDS = frozenset({"true", "ja", "yes", "1", "x"})
 FALSE_WORDS = frozenset({"false", "nein", "no", "0"})
@@ -87,7 +90,7 @@ def canonical_date(value: Any) -> str:
             return parsed.strftime(DATE_FORMAT)
         raise ScriptContractError(
             f"'{value}' ist kein gueltiges Datum. Erwartet wird JJJJ-MM-TT oder "
-            "JJJJ-MM-TT HH:MM:SS."
+            "TT.MM.JJJJ, jeweils optional mit Uhrzeit HH:MM:SS."
         )
     raise ScriptContractError("Datumswerte muessen als Text angegeben werden.")
 

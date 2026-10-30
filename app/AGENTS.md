@@ -23,6 +23,9 @@
 - `schema.py`: Profilschema mit `ColumnDef` (Schluessel `std:*`, `custom:<id>`,
   `standard:<id>`), `resolve_columns` (IDs oder Namen), `SchemaCache` mit TTL;
   `fetch_file_states` liefert die Dateistatus-Werte als Optionen von `std:fileStateID`.
+  Auswahlwerte (`selectionOptions`) kommen von der API als Antwortobjekte, nicht als Dicts:
+  `_options` normalisiert sie zu Namen und `(ID, Name)`-Paaren; ohne diese Normalisierung
+  blieben die Auswahllisten im Grid leer.
 - `normalize.py`: Anzeigenormalform je Feldtyp (Texte bleiben exakt), `values_equal`
   fuer den Diff, `display_value`.
 - `workspaces.py`: Arbeitsbestaende (Snapshot in `workspace_asset.values_json`,
@@ -161,7 +164,9 @@
 - Der Snapshot (`workspace_asset.values_json`) haelt Anzeigenormalform; das ChangeSet nur
   Zellen, deren Wert abweicht. Geloeschte Werte stehen als `NULL` im ChangeSet.
 - Texte werden nie automatisch getrimmt; normalisiert werden nur Typen, Datumsformate und
-  Mehrfachauswahlen (`app/normalize.py`).
+  Mehrfachauswahlen (`app/normalize.py`). Datumsangaben werden als `JJJJ-MM-TT` oder
+  `TT.MM.JJJJ` angenommen, jeweils optional mit Uhrzeit, und immer als
+  `JJJJ-MM-TT HH:MM:SS` gespeichert.
 - `workspace.edit_revision` erhoeht sich bei jeder Aenderung; Clients muessen ihre Revision
   mitsenden, sonst antwortet der Service mit `WorkspaceConflictError` (mehrere Tabs).
 - Entwuerfe laufen nach `DRAFT_TTL_DAYS` (30) ab; unter `EXPIRY_WARNING_DAYS` (7) Resttagen

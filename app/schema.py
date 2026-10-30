@@ -145,14 +145,15 @@ class ProfileSchema:
 
 
 def _options(field: dict[str, Any]) -> tuple[tuple[str, ...], tuple[tuple[int, str], ...]]:
+    """Auswahlwerte als Namen und als (ID, Name); die API liefert Objekte, keine Dicts."""
     names: list[str] = []
     pairs: list[tuple[int, str]] = []
     for option in field.get("selectionOptions") or []:
-        if isinstance(option, dict):
-            option_id = option.get("id")
-            name = str(option.get("name", "")).strip()
-            if name:
-                names.append(name)
+        data = option if isinstance(option, dict) else response_mapping(option)
+        option_id = data.get("id")
+        name = str(data.get("name", "")).strip()
+        if name:
+            names.append(name)
             if isinstance(option_id, int):
                 pairs.append((option_id, name))
     return tuple(names), tuple(pairs)
@@ -180,7 +181,7 @@ def fetch_metadata_fields(client: Client) -> list[dict[str, Any]]:
         for item in custom.iter_all(page_size=CUSTOM_PAGE_SIZE, max_items=FIELD_LIMIT)
     ]
     standard = StandardMetadata(client)
-    standard.set_response_fields(["id", "name", "editType"])
+    standard.set_response_fields(FIELD_RESPONSE_FIELDS)
     fields.extend(
         {"kind": "standard", **response_mapping(item)}
         for item in standard.iter_all(page_size=STANDARD_PAGE_SIZE, max_items=FIELD_LIMIT)

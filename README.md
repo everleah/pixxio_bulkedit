@@ -186,15 +186,18 @@ Namen vor dem Senden auf.
   „Übernehmen". Die Auswahl gilt nur für diesen Arbeitsbestand, wird in `params_json`
   gespeichert (höchstens 80 Spalten) und wirkt auch auf Filter, Sortierung und
   Excel-Export. „Zurücksetzen" stellt die Script- beziehungsweise Standardspalten wieder
-  her; die Spaltenreihenfolge im Grid folgt der Reihenfolge im Dialog. Werte für neu
-  hinzugekommene Spalten werden beim Übernehmen aus pixx.io nachgeladen, damit die Zellen
-  sofort gefüllt sind und Bearbeitungen darin sichtbar bleiben.
+  her. Bereits sichtbare Spalten behalten ihre Position; neu gewählte Spalten kommen in
+  Dialogreihenfolge hinten dazu und werden nach dem Übernehmen ins Bild gescrollt. Werte
+  für neu hinzugekommene Spalten werden beim Übernehmen aus pixx.io nachgeladen, damit
+  die Zellen sofort gefüllt sind und Bearbeitungen darin sichtbar bleiben.
 
   > Hinweis: Ein Profil kann sehr viele Standard-Metadatenfelder mitbringen (im
   > Testsystem rund 390). Ohne Feldfilter ist die Liste lang; „Alle" wählt dann nur bis
   > zur Obergrenze und meldet, wie viele Felder übrig blieben.
-- Editoren je Typ: Text, Zahl, Datum (`JJJJ-MM-TT HH:MM:SS`), Wahrheitswert,
-  Auswahlliste; `map`/`focalpoint`/`orientation` und `std:fileName` sind nur lesbar.
+- Editoren je Typ: Text, Zahl (Komma oder Punkt), Datum (`JJJJ-MM-TT` oder `TT.MM.JJJJ`,
+  optional mit `HH:MM:SS`), Wahrheitswert, Auswahlliste mit den Auswahlwerten des Feldes;
+  `map`/`focalpoint`/`orientation` und `std:fileName` sind nur lesbar. Ungültige Eingaben
+  melden einen Fehler und stellen den gespeicherten Wert wieder her.
 - Das Grid füllt die verfügbare Fensterhöhe: `.nicegui-content` steht auf `100vh`, das
   Grid ist ein flexibles Element mit `min-height: 320px`. Die Seite selbst scrollt nicht,
   gescrollt wird im Grid.

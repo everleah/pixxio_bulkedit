@@ -21,6 +21,8 @@ LOCALE_STORAGE_KEY = "locale"
 
 # Englische Übersetzungen; Schlüssel ist der deutsche Quelltext.
 EN_TRANSLATIONS: dict[str, str] = {
+    # Verbindungsbanner
+    "Verbindung unterbrochen – bitte die Seite neu laden.": "Connection lost - please reload the page.",
     # Arbeitsbestand: Texte ohne offene Aenderungen
     "Arbeitsbestand '{name}' endgültig löschen? Der Entwurf und seine Zeilen werden entfernt.": "Delete workspace '{name}' permanently? The draft and its rows will be removed.",
     "Arbeitsbestand '{name}' schließen? Der Entwurf verschwindet aus der Liste und lässt sich über „geschlossene anzeigen“ wieder öffnen.": "Close workspace '{name}'? The draft disappears from the list and can be reopened via \"show closed\".",
@@ -311,7 +313,8 @@ EN_TRANSLATIONS: dict[str, str] = {
     "Spalten an Anzeige anpassen": "Size columns to display",
     "Wert auf Ziel setzen": "Set value on target",
     "Änderungen verwerfen": "Discard changes",
-    "Format JJJJ-MM-TT HH:MM:SS": "Format YYYY-MM-DD HH:MM:SS",
+    "Datum als JJJJ-MM-TT oder TT.MM.JJJJ, Uhrzeit HH:MM:SS": "Date as YYYY-MM-DD or DD.MM.YYYY, time HH:MM:SS",
+    "Zahl, Dezimaltrennzeichen Komma oder Punkt": "Number, decimal separator comma or dot",
     "Mehrere Werte mit Komma trennen": "Separate multiple values with commas",
     "Bitte eine Zielspalte wählen.": "Please select a target column.",
     "Keine Zeile markiert.": "No row selected.",

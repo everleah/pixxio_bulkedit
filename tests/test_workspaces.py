@@ -92,9 +92,12 @@ def test_datum_wird_normalisiert() -> None:
     assert canonical_date("2026-12-31") == "2026-12-31 00:00:00"
     assert canonical_date("2026-12-31 23:45") == "2026-12-31 23:45:00"
     assert canonical_date("2026-12-31T23:45:12") == "2026-12-31 23:45:12"
+    assert canonical_date("31.12.2026") == "2026-12-31 00:00:00"
+    assert canonical_date("31.12.2026 23:45") == "2026-12-31 23:45:00"
+    assert canonical_date(" 31.12.2026 23:45:12 ") == "2026-12-31 23:45:12"
 
 
-@pytest.mark.parametrize("value", ["31.12.2026", "2026-12-31 23:45:00+02:00", "morgen"])
+@pytest.mark.parametrize("value", ["2026-12-31 23:45:00+02:00", "morgen", "31.13.2026"])
 def test_ungueltige_daten_werden_abgelehnt(value: str) -> None:
     with pytest.raises(ScriptContractError):
         canonical_date(value)
@@ -190,6 +193,33 @@ def test_schema_bauen() -> None:
     assert "std:subject" in keys
     assert "custom:4711" in keys
     assert "standard:978216530" in keys
+
+
+class _Option:
+    """Nachbildung der Client-Antwort: Auswahlwerte kommen als Objekt, nicht als Dict."""
+
+    def __init__(self, option_id: int, name: str) -> None:
+        self._data = {"id": option_id, "name": name, "order": "n"}
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self._data)
+
+
+def test_auswahlwerte_kommen_als_objekte() -> None:
+    fields = [
+        {
+            "kind": "custom",
+            "id": 4714,
+            "name": "Auswahl",
+            "editType": "selection",
+            "selectionOptions": [_Option(11, "Sommer"), _Option(12, "Winter"), _Option(13, "")],
+        }
+    ]
+    schema = build_schema(fields)
+    column = schema.by_key("custom:4714")
+    assert column is not None
+    assert column.options == ("Sommer", "Winter")
+    assert column.option_ids == ((11, "Sommer"), (12, "Winter"))
 
 
 def test_spalten_werden_per_id_und_name_aufgeloest() -> None:
@@ -456,6 +486,28 @@ def test_spaltenauswahl_sortiert_innerhalb_der_gruppen() -> None:
     assert column_sort_key(umlaut) < column_sort_key(
         ColumnDef(key="std:subject", label="Zebra", source="file_attr", edit_type="text")
     )
+
+
+def test_uebernahme_haelt_die_reihenfolge_und_haengt_neue_spalten_an() -> None:
+    from app.ui.workspaces import ordered_keys
+
+    current = ["std:articleNumber", "std:subject", "custom:4711"]
+    dialog_order = [
+        "std:creator",
+        "std:articleNumber",
+        "custom:4711",
+        "std:subject",
+        "std:fileName",
+    ]
+    chosen = {"std:subject", "custom:4711", "std:fileName", "std:creator"}
+    assert ordered_keys(current, chosen, dialog_order) == [
+        "std:subject",
+        "custom:4711",
+        "std:creator",
+        "std:fileName",
+    ]
+    assert ordered_keys(current, {"std:subject"}, dialog_order) == ["std:subject"]
+    assert ordered_keys(current, set(), dialog_order) == []
 
 
 def test_aenderung_setzen_und_zuruecknehmen(
