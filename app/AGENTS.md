@@ -131,6 +131,12 @@
   `export_id`, `three_way`); Laeufe daraus tragen `run.source = xlsx` und
   `run.xlsx_export_id`. Die weitere Pruefung laeuft ueber Review, Dry Run und Schreiben
   wie bei jeder Grid-Aenderung.
+- Zellwerte werden bereits beim Lesen geprueft (`canonical`); fehlerhafte Zellen landen als
+  `CellIssue` mit `key` und Zeile im Ergebnis und werden nicht in den Abgleich uebernommen.
+  `build_error_workbook` erzeugt daraus eine Kopie der hochgeladenen Arbeitsmappe mit
+  markierten Zellen (`ERROR_FILL`), Kommentar je Zelle und dem Blatt `Fehler` (Zeile,
+  Spalte, Meldung); `Info` erhaelt `fehler`/`hinweis`. Das Format bleibt `bulkedit-xlsx`,
+  damit die korrigierte Datei erneut importiert werden kann.
 - Werte im effektiven Stand immer als `CASE WHEN change.id IS NOT NULL THEN change.new_value
   ELSE json_extract(...) END` ausdruecken; `COALESCE` wuerde geleerte Werte falsch aufloesen.
 - Spaltenkennungen sind durchgaengig `std:<attribut>`, `custom:<feld-id>` oder

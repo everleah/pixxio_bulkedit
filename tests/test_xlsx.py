@@ -26,7 +26,7 @@ from app.workspaces import (
 )
 from app.writeplan import build_preview, save_plan
 from app.writer import dry_run
-from app.xlsx import XlsxError
+from app.xlsx import ERROR_SHEET, XlsxError
 
 FILENAME = ColumnDef(key="std:fileName", label="Dateiname", source="file_attr", edit_type="text")
 SUBJECT = ColumnDef(key="std:subject", label="Titel", source="file_attr", edit_type="text")
@@ -595,6 +595,84 @@ def test_import_lauf_hat_quelle_xlsx(
     assert run is not None
     assert run.source is RunSource.XLSX
     assert run.xlsx_export_id == export.export_id
+
+
+# --- Fehlerdatei -------------------------------------------------------------
+
+
+def test_fehlerdatei_markiert_zelle_und_listet_befunde(
+    session: Session, workspace: Workspace, profile: Profile, owner: AppUser, client: None
+) -> None:
+    data = _edit(_export(session, workspace, profile, owner).data, xlsx.DATA_SHEET, "F3", "C")
+    parsed = xlsx.parse_workbook(data, COLUMNS)
+    payload, name = xlsx.build_error_workbook(
+        data, issues=parsed.issues, filename="probe.xlsx", moment=MOMENT
+    )
+    assert name == "probe_fehler_20261030-1511.xlsx"
+    report = load_workbook(io.BytesIO(payload))
+    sheet = report[xlsx.DATA_SHEET]
+    cell = sheet["F3"]
+    assert cell.value == "C"
+    assert cell.fill.fgColor.rgb.endswith("FCA5A5")
+    assert cell.comment is not None
+    assert "Auswahl" in cell.comment.text
+    fehler = report[ERROR_SHEET]
+    assert [fehler.cell(row=1, column=index).value for index in (1, 2, 3)] == [
+        "Zeile",
+        "Spalte",
+        "Meldung",
+    ]
+    assert fehler.cell(row=2, column=1).value == 3
+    assert fehler.cell(row=2, column=2).value == "Kampagne"
+    message = str(fehler.cell(row=2, column=3).value)
+    assert "Auswahl" in message
+    assert fehler.max_row == 2
+
+
+def test_fehlerdatei_markiert_zeilenfehler_in_spalte_a(
+    session: Session, workspace: Workspace, profile: Profile, owner: AppUser, client: None
+) -> None:
+    data = _edit(_export(session, workspace, profile, owner).data, xlsx.DATA_SHEET, "A3", "abc")
+    parsed = xlsx.parse_workbook(data, COLUMNS)
+    payload, _name = xlsx.build_error_workbook(data, issues=parsed.issues, filename="probe.xlsx")
+    sheet = load_workbook(io.BytesIO(payload))[xlsx.DATA_SHEET]
+    assert sheet["A3"].fill.fgColor.rgb.endswith("FCA5A5")
+    assert sheet["A3"].comment is not None
+
+
+def test_fehlerdatei_bleibt_importierbar(
+    session: Session, workspace: Workspace, profile: Profile, owner: AppUser, client: None
+) -> None:
+    export = _export(session, workspace, profile, owner)
+    broken = _edit(export.data, xlsx.DATA_SHEET, "F3", "C")
+    parsed = xlsx.parse_workbook(broken, COLUMNS)
+    payload, _name = xlsx.build_error_workbook(broken, issues=parsed.issues, filename="probe.xlsx")
+    fixed = _edit(payload, xlsx.DATA_SHEET, "F3", "B")
+    result = _import(session, profile, owner, fixed)
+    assert result.three_way is True
+    assert result.changed == 1
+    assert result.issues == []
+
+
+def test_fehlerdatei_traegt_hinweis_im_info_blatt(
+    session: Session, workspace: Workspace, profile: Profile, owner: AppUser, client: None
+) -> None:
+    data = _edit(_export(session, workspace, profile, owner).data, xlsx.DATA_SHEET, "F3", "C")
+    parsed = xlsx.parse_workbook(data, COLUMNS)
+    payload, _name = xlsx.build_error_workbook(data, issues=parsed.issues, filename="probe.xlsx")
+    info = _info(payload)
+    assert info["fehler"] == "1"
+    assert "markierte Zellen" in info["hinweis"]
+    assert info["format"] == xlsx.FORMAT
+
+
+def test_fehlerdatei_ohne_befunde_bleibt_leer(
+    session: Session, workspace: Workspace, profile: Profile, owner: AppUser
+) -> None:
+    data = _export(session, workspace, profile, owner).data
+    payload, _name = xlsx.build_error_workbook(data, issues=[], filename="probe.xlsx")
+    report = load_workbook(io.BytesIO(payload))
+    assert report[ERROR_SHEET].max_row == 1
 
 
 # --- Aufbewahrung ------------------------------------------------------------

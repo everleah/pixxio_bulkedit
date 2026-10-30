@@ -92,6 +92,9 @@
   "Ohne Exportbasis importieren" bestaetigt wurde. Nach Erfolg fuehrt ein Button in den
   neuen Arbeitsbestand (Review). Nur Editor und Superuser duerfen importieren, das Profil
   muss `allow_write` haben.
+- Bei Befunden erscheint "Fehlerdatei herunterladen": `build_error_workbook` laeuft in
+  `run.io_bound` und startet `ui.download`; der Knopf verschwindet beim naechsten Upload
+  wieder (`_reset_import`).
 
 ## Work Guidance
 

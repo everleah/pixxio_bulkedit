@@ -21,6 +21,13 @@ LOCALE_STORAGE_KEY = "locale"
 
 # Englische Übersetzungen; Schlüssel ist der deutsche Quelltext.
 EN_TRANSLATIONS: dict[str, str] = {
+    # Excel-Fehlerdatei
+    "Fehlerdatei erstellt: {count} markierte Zellen.": "Error file created: {count} marked cells.",
+    "Fehlerdatei herunterladen": "Download error file",
+    "Fehlerdatei: markierte Zellen prüfen, dann erneut importieren.": "Error file: check the marked cells, then import again.",
+    "Keine Befunde zum Markieren vorhanden.": "No findings to mark.",
+    "Meldung": "Message",
+    "Zeile": "Row",
     # Excel-Schnittstelle
     "Abbrechen": "Cancel",
     "Anzeigename": "Display name",

@@ -17,9 +17,11 @@ import zipfile
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.comments import Comment
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -61,6 +63,9 @@ MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_UNPACKED_BYTES = 200 * 1024 * 1024
 MAX_CELL_CHARS = 32_767
 HEADER_FILL = PatternFill("solid", fgColor="E2E8F0")
+ERROR_FILL = PatternFill("solid", fgColor="FCA5A5")
+ERROR_SHEET = "Fehler"
+ISSUE_AUTHOR = "pixx.io Bulk-Editor"
 SLUG_PATTERN = re.compile(r"[^0-9A-Za-zÄÖÜäöüß._-]+")
 READ_ONLY_NOTE = "nur lesen, wird beim Import ignoriert"
 
@@ -76,6 +81,7 @@ class CellIssue:
     row: int
     label: str
     message: str
+    key: str = ""
 
     def as_text(self) -> str:
         return t(
@@ -587,6 +593,7 @@ def _read_data(
                     row_number,
                     t(ID_LABEL),
                     t("Die Datei-ID „{value}“ ist keine Zahl.", value=raw_id),
+                    key=ID_KEY,
                 )
             )
             continue
@@ -596,6 +603,7 @@ def _read_data(
                     row_number,
                     t(ID_LABEL),
                     t("Die Datei-ID {id} kommt mehrfach vor.", id=file_id),
+                    key=ID_KEY,
                 )
             )
             continue
@@ -606,11 +614,22 @@ def _read_data(
             if getattr(cell, "data_type", None) == "f":
                 issues.append(
                     CellIssue(
-                        row_number, labels_by_index[index], t("Formeln werden nicht unterstützt.")
+                        row_number,
+                        labels_by_index[index],
+                        t("Formeln werden nicht unterstützt."),
+                        key=column.key,
                     )
                 )
                 continue
-            values[column.key] = getattr(cell, "value", None)
+            raw = getattr(cell, "value", None)
+            try:
+                canonical(column.edit_type, raw, options=column.options)
+            except ScriptContractError as exc:
+                issues.append(
+                    CellIssue(row_number, labels_by_index[index], str(exc), key=column.key)
+                )
+                continue
+            values[column.key] = raw
         rows.append(ImportRow(row=row_number, file_id=file_id, cells=values))
         if max_rows is not None and len(rows) > max_rows:
             raise XlsxError(
@@ -697,6 +716,7 @@ def diff_rows(
                     row.row,
                     t(ID_LABEL),
                     t("Die Datei ist nicht mehr vorhanden oder nicht sichtbar."),
+                    key=ID_KEY,
                 )
             )
             continue
@@ -707,7 +727,7 @@ def diff_rows(
             try:
                 value = canonical(column.edit_type, raw, options=column.options)
             except ScriptContractError as exc:
-                result.issues.append(CellIssue(row.row, column.label, str(exc)))
+                result.issues.append(CellIssue(row.row, column.label, str(exc), key=key))
                 continue
             if old_values is not None:
                 old = old_values.get(key)
@@ -734,6 +754,7 @@ def diff_rows(
                                 "In pixx.io steht inzwischen „{current}“; die Zelle wird übersprungen.",
                                 current=display_value(live),
                             ),
+                            key=key,
                         )
                     )
                 continue
@@ -861,6 +882,81 @@ def import_workbook(
     )
 
 
+def error_filename(filename: str, moment: datetime | None = None) -> str:
+    """Name der Fehlerdatei zu einer hochgeladenen Arbeitsmappe."""
+    stem = Path(filename or "import").stem or "import"
+    stamp = (moment or utc_now()).strftime("%Y%m%d-%H%M")
+    return f"{slugify(stem, 'import')}_fehler_{stamp}.xlsx"
+
+
+def build_error_workbook(
+    data: bytes,
+    *,
+    issues: Sequence[CellIssue],
+    filename: str = "",
+    moment: datetime | None = None,
+) -> tuple[bytes, str]:
+    """Kopie der Arbeitsmappe mit markierten Problemzellen und Blatt ``Fehler``.
+
+    Die Kopie bleibt importierbar: Nach dem Korrigieren der markierten Zellen kann
+    dieselbe Datei erneut hochgeladen werden.
+    """
+    _check_payload(data)
+    workbook = load_workbook(io.BytesIO(data), data_only=False)
+    if DATA_SHEET in workbook.sheetnames:
+        sheet = workbook[DATA_SHEET]
+        keys = {
+            _cell_text(cell): index
+            for index, cell in enumerate(sheet[1], start=1)
+            if _cell_text(cell)
+        }
+        labels: dict[str, int] = {}
+        if sheet.max_row >= 2:
+            labels = {
+                _cell_text(cell): index
+                for index, cell in enumerate(sheet[2], start=1)
+                if _cell_text(cell)
+            }
+        for issue in issues:
+            index = keys.get(issue.key or "") or labels.get(issue.label) or 1
+            cell = sheet.cell(row=max(1, issue.row), column=index)
+            cell.fill = ERROR_FILL
+            cell.comment = Comment(issue.message, ISSUE_AUTHOR)
+    report = (
+        workbook[ERROR_SHEET]
+        if ERROR_SHEET in workbook.sheetnames
+        else workbook.create_sheet(ERROR_SHEET)
+    )
+    _write_header_row(report, 1, [t("Zeile"), t("Spalte"), t("Meldung")])
+    for offset, issue in enumerate(issues, start=1):
+        report.cell(row=1 + offset, column=1, value=int(issue.row))
+        _text_cell(report.cell(row=1 + offset, column=2), issue.label)
+        _text_cell(report.cell(row=1 + offset, column=3), issue.message)
+    report.column_dimensions["A"].width = 10
+    report.column_dimensions["B"].width = 28
+    report.column_dimensions["C"].width = 80
+    report.freeze_panes = "A2"
+    if INFO_SHEET in workbook.sheetnames:
+        info_sheet = workbook[INFO_SHEET]
+        existing = {_cell_text(cell) for cell in info_sheet["A"]}
+        row = info_sheet.max_row + 1
+        additions = (
+            ("fehler", str(len(issues))),
+            ("hinweis", t("Fehlerdatei: markierte Zellen prüfen, dann erneut importieren.")),
+        )
+        for key_name, value in additions:
+            if key_name in existing:
+                continue
+            key_cell = info_sheet.cell(row=row, column=1)
+            _text_cell(key_cell, key_name)
+            key_cell.font = Font(bold=True)
+            _text_cell(info_sheet.cell(row=row, column=2), value)
+            row += 1
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue(), error_filename(filename, moment)
+
+
 def document_summary(parsed: ParsedWorkbook) -> list[str]:
     """Kurzfassung der gelesenen Arbeitsmappe für die Oberfläche."""
     lines = [
@@ -894,9 +990,11 @@ __all__ = [
     "ImportResult",
     "ParsedWorkbook",
     "XlsxError",
+    "build_error_workbook",
     "build_workbook",
     "diff_rows",
     "document_summary",
+    "error_filename",
     "export_filename",
     "export_key",
     "export_workbook",

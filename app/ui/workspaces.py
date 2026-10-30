@@ -59,6 +59,7 @@ from app.workspaces import (
 from app.xlsx import (
     MAX_FILE_BYTES,
     XlsxError,
+    build_error_workbook,
     document_summary,
     export_workbook,
     has_snapshot,
@@ -561,6 +562,8 @@ def register_workspace_pages(
             )
             import_confirm.set_visibility(False)
             with ui.row().classes("w-full justify-end gap-2"):
+                import_error_file = ui.button(t("Fehlerdatei herunterladen")).props("flat")
+                import_error_file.set_visibility(False)
                 ui.button(t("Abbrechen"), on_click=import_dialog.close).props("flat")
                 import_open = ui.button(
                     t("Zum Arbeitsbestand"),
@@ -576,8 +579,9 @@ def register_workspace_pages(
             import_confirm.set_visibility(False)
             import_confirm.value = False
             import_open.set_visibility(False)
+            import_error_file.set_visibility(False)
             import_start.disable()
-            import_state.update({"data": b"", "name": "", "workspace": None})
+            import_state.update({"data": b"", "name": "", "workspace": None, "issues": []})
 
         async def uploaded(event: Any) -> None:
             _reset_import()
@@ -611,7 +615,7 @@ def register_workspace_pages(
             if outcome is None:
                 return
             parsed, snapshot = outcome
-            import_state.update({"data": data, "name": name})
+            import_state.update({"data": data, "name": name, "issues": list(parsed.issues)})
             with import_summary:
                 for line in document_summary(parsed):
                     ui.label(line).classes("text-xs")
@@ -629,6 +633,7 @@ def register_workspace_pages(
                     )
                     for issue in parsed.issues[:50]:
                         ui.label(issue.as_text())
+                import_error_file.set_visibility(True)
             if snapshot:
                 import_start.enable()
             else:
@@ -705,13 +710,38 @@ def register_workspace_pages(
                     for warning in imported.warnings:
                         ui.label(warning)
             import_state["workspace"] = imported.workspace_id
+            import_state["issues"] = list(imported.issues)
+            if imported.issues:
+                import_error_file.set_visibility(True)
             if imported.workspace_id is not None:
                 import_open.set_visibility(True)
+
+        async def download_error_file() -> None:
+            data = import_state["data"]
+            issues = import_state["issues"]
+            if not data or not issues:
+                ui.notify(t("Keine Befunde zum Markieren vorhanden."), color="warning")
+                return
+
+            def job() -> Any:
+                return build_error_workbook(data, issues=issues, filename=import_state["name"])
+
+            try:
+                made = await run.io_bound(job)
+            except XlsxError as exc:
+                ui.notify(describe_error(exc), color="negative")
+                return
+            if made is None:
+                return
+            payload, name = made
+            ui.download(payload, name)
+            ui.notify(t("Fehlerdatei erstellt: {count} markierte Zellen.", count=len(issues)))
 
         import_button.on_click(import_dialog.open)
         import_upload.on_upload(uploaded)
         import_confirm.on_value_change(lambda _: confirm_changed())
         import_start.on_click(start_import_now)
+        import_error_file.on_click(download_error_file)
 
         def _remove(workspace_id: int) -> None:
             with session_scope(session_factory) as session:

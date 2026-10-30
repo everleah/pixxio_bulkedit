@@ -673,14 +673,16 @@ Import ohne Snapshot und Fehlerdatei-Download folgen erst danach.
 | Keine Formeln/Makros | `vbaProject` wird abgelehnt, Formelzellen als Befund gemeldet |
 | Formel-Injection | Textzellen werden mit `data_type = "s"` geschrieben und bleiben Text |
 | ZIP-Schutz | Pruefung von Signatur und entpackter Groesse vor dem Lesen |
-| Feldbezogene Fehler | `CellIssue` mit „Zeile · Spalte · Meldung" in Oberflaeche und Import-Ergebnis |
+| Feldbezogene Fehler | `CellIssue` mit „Zeile · Spalte · Meldung" in Oberflaeche und Import-Ergebnis; Zellwerte werden schon beim Lesen geprueft |
 | Import ohne Snapshot | Zwei-Wege-Vergleich mit ausdruecklicher Bestaetigung; leere Zellen bleiben unberuecksichtigt |
+| Fehlerdatei | `xlsx.build_error_workbook`: Kopie der hochgeladenen Arbeitsmappe mit farblich markierten Problemzellen, Kommentar je Zelle, Blatt `Fehler` (Zeile · Spalte · Meldung) und Vermerk im Blatt `Info`; die Kopie bleibt nach der Korrektur importierbar |
 
 Live-Nachweis: Export aus einem Arbeitsbestand, Aenderung von `std:subject` in der Datei,
 Import mit genau einer Aenderung, Review ohne Fehler, Dry Run (Lauf 16) und Schreiben
 (Lauf 17) mit Ruecklesung `ok`; ein zu alter Snapshot wurde korrekt als Konflikt gemeldet.
-
-Noch offen: Download einer Fehlerdatei mit Markierung der abgelehnten Zellen.
+Fehlerdatei live geprueft: ungueltiges Datum in `Datum_Test` → Befund „Zeile 3 ·
+Datum_Test · …", markierte Zelle `K3` mit Kommentar, Blatt `Fehler` mit einer Zeile; nach
+Korrektur derselben Datei importierte der Lauf 2 Aenderungen ohne Befund.
 
 ## 14. Abhaengigkeiten und Reihenfolge
 

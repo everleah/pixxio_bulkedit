@@ -242,6 +242,11 @@ bearbeiten, importieren, prüfen (Review/Dry Run) und erst dann schreiben.
 - Ohne Exportbasis (Snapshot abgelaufen oder fremde Datei) ist nur ein Zwei-Wege-Vergleich
   möglich: leere Zellen bleiben dann unberücksichtigt, und die Oberfläche verlangt eine
   ausdrückliche Bestätigung.
+- Beanstandete Zellen lassen sich als **Fehlerdatei** herunterladen: eine Kopie der
+  hochgeladenen Arbeitsmappe, in der jede Problemzelle farbig markiert und mit einem
+  Kommentar versehen ist; zusätzlich listet das Blatt `Fehler` alle Befunde als
+  „Zeile · Spalte · Meldung". Die Kopie bleibt importierbar — markierte Zellen in Excel
+  korrigieren und dieselbe Datei erneut hochladen.
 - Grenzen: nur `.xlsx` (keine Makros, keine Formeln), 20 MB Dateigröße, Zeilenlimit des
   Profils, Zelltexte bis 32 767 Zeichen (längere werden gekürzt und als solche behandelt).
 - Export-Snapshots liegen in `xlsx_export` und werden nach 90 Tagen mit

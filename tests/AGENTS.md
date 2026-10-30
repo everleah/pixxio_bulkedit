@@ -51,7 +51,8 @@
   Kopfzeilen, `@`-Infospalten, Auswahlliste, Kuerzung langer Texte), Schutz vor
   Formeleinschleusung, Export-Snapshot und Aufbewahrungsgrenze, Import mit Drei-Wege-
   Abgleich (Aenderung, bereits erledigt, Konflikt, Leeren), Zwei-Wege-Rueckfall ohne
-  Snapshot, Format-/Host-/Spaltenpruefungen, Zeilenlimit und `run.source = xlsx`.
+  Snapshot, Format-/Host-/Spaltenpruefungen, Zeilenlimit, `run.source = xlsx` und die
+  Fehlerdatei (markierte Zellen, Blatt `Fehler`, erneuter Import nach Korrektur).
 
 ## Local Contracts
 
