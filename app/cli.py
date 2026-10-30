@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import sys
 from collections.abc import Sequence
 
+from dotenv import dotenv_values
 from pydantic import ValidationError
 from sqlalchemy import select
 
@@ -18,9 +20,10 @@ from app.auth import (
     set_active,
     set_role,
 )
-from app.crypto import generate_master_key
+from app.crypto import SecretBox, generate_master_key
 from app.db import create_engine_for, create_session_factory, run_migrations, session_scope
-from app.models import AppUser, Role
+from app.models import AppUser, Profile, Role
+from app.profiles import ProfileData, ProfileError, create_profile, update_profile
 from app.settings import Settings, get_settings
 
 EXIT_CONFIG_ERROR = 2
@@ -102,6 +105,50 @@ def command_create_superuser(args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_api_key(env_name: str) -> str:
+    """Liest den API-Key aus der Umgebung oder aus ``.env``.
+
+    Der Key wird nie als Argument uebergeben, damit er nicht in der Shell-Historie
+    oder in Protokollen landet.
+    """
+    value = os.environ.get(env_name, "").strip()
+    if value:
+        return value
+    env_file = dotenv_values(".env")
+    fallback = env_file.get(env_name) or ""
+    if isinstance(fallback, str) and fallback.strip():
+        return fallback.strip()
+    raise CliError(f"Umgebungsvariable {env_name} ist nicht gesetzt und steht auch nicht in .env.")
+
+
+def command_create_profile(args: argparse.Namespace) -> int:
+    settings = _require_settings()
+    factory = _open_session_factory(settings)
+    api_key = _read_api_key(args.api_key_env)
+    data = ProfileData(
+        name=args.name,
+        host=args.host,
+        api_key=api_key,
+        max_retries=args.max_retries,
+        max_rows=args.max_rows,
+        allow_write=not args.read_only,
+        is_active=not args.inactive,
+    )
+    secret_box = SecretBox.from_master_key(settings.master_key)
+    with session_scope(factory) as session:
+        existing = session.scalar(select(Profile).where(Profile.name == data.name.strip()))
+        try:
+            if existing is None:
+                create_profile(session, secret_box, data, actor=None)
+                print(f"Profil {data.name!r} angelegt.")
+            else:
+                update_profile(session, secret_box, existing, data, actor=None)
+                print(f"Profil {data.name!r} aktualisiert.")
+        except ProfileError as exc:
+            raise CliError(str(exc)) from exc
+    return 0
+
+
 def command_serve(_args: argparse.Namespace) -> int:
     from app.main import main as run_server
 
@@ -131,6 +178,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Passwort aus der ersten stdin-Zeile lesen statt interaktiv abzufragen",
     )
     create_superuser.set_defaults(handler=command_create_superuser)
+
+    create_profile = subparsers.add_parser(
+        "create-profile", help="pixx.io-Profil anlegen oder aktualisieren"
+    )
+    create_profile.add_argument("--name", required=True, help="Profilname, z. B. 'test'")
+    create_profile.add_argument(
+        "--host", required=True, help="Host ohne Protokoll, z. B. 'firma.px.media'"
+    )
+    create_profile.add_argument(
+        "--api-key-env",
+        required=True,
+        help="Name der Umgebungsvariablen mit dem API-Key (Key nie als Argument uebergeben)",
+    )
+    create_profile.add_argument("--max-retries", type=int, default=3)
+    create_profile.add_argument("--max-rows", type=int, default=5_000)
+    create_profile.add_argument(
+        "--read-only", action="store_true", help="Schreibzugriff fuer dieses Profil sperren"
+    )
+    create_profile.add_argument("--inactive", action="store_true", help="Profil deaktivieren")
+    create_profile.set_defaults(handler=command_create_profile)
 
     serve = subparsers.add_parser("serve", help="Weboberflaeche starten")
     serve.set_defaults(handler=command_serve)

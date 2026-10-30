@@ -269,6 +269,13 @@ vor Phase 2 entschieden.
 - API-Keys verschluesselt, ausschliesslich serverseitig verfuegbar.
 - Schutz des letzten aktiven Superusers.
 
+Umgesetzt (Oktober 2026): `app/profiles.py` (Anlegen/Aendern inklusive Key-Rotation,
+Verbindungstest, Admin-Audit), `app/clients.py` (`ClientFactory` je Profil mit Cache und
+Invalidierung), `app/ui/` mit `/admin/profiles` und `/admin/users` sowie der CLI-Befehl
+`create-profile`. Der API-Key wird beim Anlegen aus einer Umgebungsvariablen oder aus
+`.env` gelesen (`--api-key-env`) und erscheint nie in Argumenten, Logs oder im Browser;
+in der Oberflaeche ist das Key-Feld write-only und zeigt nur den Hint.
+
 Die Anwendung ist oeffentlich ueber HTTPS erreichbar. Ein zweiter Faktor ist nicht
 verpflichtend; das verbleibende Risiko wird dokumentiert.
 

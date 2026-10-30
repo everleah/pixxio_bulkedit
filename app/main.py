@@ -17,10 +17,10 @@ from app.auth import (
     LoginThrottle,
     authenticate,
     normalize_username,
-    session_is_expired,
     session_payload,
 )
-from app.colors import PALETTE
+from app.clients import ClientFactory
+from app.crypto import SecretBox
 from app.db import (
     SessionFactory,
     create_engine_for,
@@ -28,26 +28,15 @@ from app.db import (
     run_migrations,
     session_scope,
 )
-from app.models import AppUser
+from app.models import AppUser, Role
 from app.settings import get_settings
+from app.ui.admin import register_admin_pages
+from app.ui.guard import current_user, logout
+from app.ui.shell import apply_palette
 
 logger = logging.getLogger(__name__)
 
 APP_TITLE = "pixx.io Bulk-Editor"
-
-
-def _current_user(session_factory: SessionFactory) -> AppUser | None:
-    payload = app.storage.user
-    if not payload or session_is_expired(payload):
-        return None
-    user_id = payload.get("user_id")
-    if not isinstance(user_id, int):
-        return None
-    with session_scope(session_factory) as session:
-        user = session.get(AppUser, user_id)
-        if user is None or not user.is_active:
-            return None
-        return user
 
 
 def _login_view(
@@ -85,13 +74,18 @@ def _login_view(
 
 
 def _home_view(user: AppUser, timeout: timedelta) -> None:
-    def logout() -> None:
-        app.storage.user.clear()
-        ui.navigate.reload()
-
+    apply_palette()
     with ui.column().classes("absolute-center items-center gap-2"):
         ui.label(APP_TITLE).classes("text-2xl font-semibold")
         ui.label(f"Angemeldet als {user.username} ({user.role.value})")
+        if user.role is Role.SUPERUSER:
+            with ui.row().classes("gap-2"):
+                ui.button("Profile", on_click=lambda: ui.navigate.to("/admin/profiles")).props(
+                    "outline dense"
+                )
+                ui.button("Benutzer", on_click=lambda: ui.navigate.to("/admin/users")).props(
+                    "outline dense"
+                )
         ui.label("Profilwahl, Scripts und Grid folgen in den naechsten Meilensteinen.").classes(
             "text-sm"
         )
@@ -107,17 +101,21 @@ def main() -> None:
     run_migrations(settings)
     engine = create_engine_for(settings)
     session_factory = create_session_factory(engine)
+    secret_box = SecretBox.from_master_key(settings.master_key)
+    client_factory = ClientFactory(secret_box)
     throttle = LoginThrottle(settings.login_max_attempts, settings.login_window_seconds)
     timeout = timedelta(minutes=settings.session_timeout_minutes)
 
     @ui.page("/")
     def index() -> None:
-        ui.colors(primary=PALETTE.primary, negative=PALETTE.error, warning=PALETTE.warning)
-        user = _current_user(session_factory)
+        apply_palette()
+        user = current_user(session_factory)
         if user is None:
             _login_view(session_factory, throttle, timeout)
         else:
             _home_view(user, timeout)
+
+    register_admin_pages(session_factory, secret_box, client_factory)
 
     ui.run(
         title=APP_TITLE,

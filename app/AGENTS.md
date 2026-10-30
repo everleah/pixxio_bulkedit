@@ -18,7 +18,14 @@
 - `auth.py`: Argon2id-Hashes, Rollen und Rechte, Login-Drosselung, Session-Helfer,
   Schutz des letzten aktiven Superusers.
 - `colors.py`: Meadow-Palette und WCAG-Kontrastberechnung.
-- `cli.py` mit `__main__.py`: `init-db`, `generate-master-key`, `create-superuser`, `serve`.
+- `profiles.py`: Profile anlegen und aendern (API-Key verschluesselt, Hint statt Key),
+  Verbindungstest protokollieren, Host normalisieren; schreibt `AdminAudit`-Eintraege.
+- `clients.py`: `ClientFactory` haelt je Profil einen pixx.io-Client, ent- und
+  verschluesselt den Key nur dort und liefert `current_user_name` fuer Verbindungstests.
+- `ui/`: `guard.py` (Session- und Rollenpruefung), `shell.py` (Palette und Kopfzeile),
+  `admin.py` (Seiten `/admin/profiles` und `/admin/users`); Details in `ui/AGENTS.md`.
+- `cli.py` mit `__main__.py`: `init-db`, `generate-master-key`, `create-superuser`,
+  `create-profile`, `serve`.
 - `spike/`: Machbarkeitspruefungen der Phase 1 gegen ein Testsystem. `settings.py` liest
   `PXTEST_*`, `client.py` haelt die Seitenlimits, `discovery.py` liest Schema und Werte,
   `ledger.py` fuehrt selbst angelegte Test-Assets, `guard.py` setzt die Schutzgrenze,
@@ -28,7 +35,8 @@
   deterministische Assets, `queries.py` haelt die SQL-Abfragen auf dem effektiven Stand,
   `runner.py` misst Datenbankverhalten, `grid.py` stellt den Grid-Prototyp unter `/bench`
   bereit, `cli.py` berichtet.
-- `main.py`: NiceGUI-Start, Anmeldung und Session-Ablauf.
+- `main.py`: NiceGUI-Start, Anmeldung, Session-Ablauf; registriert die Admin-Seiten und
+  gibt `SecretBox`/`ClientFactory` als Anwendungszustand weiter.
 - `alembic.ini` und `migrations/`: root-owned; Schemaaenderungen laufen ausschliesslich
   ueber Alembic-Revisionen.
 
@@ -80,4 +88,5 @@
 
 ## Child DOX Index
 
-- Keine weiteren untergeordneten DOX-Dokumente; `models/` wird hier mitgefuehrt.
+- `ui/AGENTS.md`: NiceGUI-Seiten, Zugriffsschutz je Seite und Profile-/Benutzerverwaltung.
+- `models/` wird hier mitgefuehrt.

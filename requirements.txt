@@ -3,6 +3,7 @@ pixxio-client
 nicegui>=3,<4
 pydantic>=2,<3
 pydantic-settings>=2,<3
+python-dotenv>=1,<2
 SQLAlchemy>=2,<3
 alembic>=1.16,<2
 cryptography>=46

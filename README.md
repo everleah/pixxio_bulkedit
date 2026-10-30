@@ -49,7 +49,8 @@ Fuer Abnahmen dokumentierter Stand: `pixxio-client 0.4.4` (PyPI, 30.10.2026).
 ## Projektstruktur
 
 - `app/`: Anwendungspaket mit Einstellungen, Datenbankschicht, Modellen, Anmeldung,
-  Farben, Kommandozeile und NiceGUI-Start.
+  Profilen und Client-Factory, Farben, Kommandozeile, NiceGUI-Start sowie `ui/` fuer
+  Seiten und Zugriffsschutz.
 - `migrations/` und `alembic.ini`: Alembic-Umgebung mit der Initial-Revision `0001`.
 - `tests/`: Offline-Tests ohne pixx.io-Zugriff.
 - `plan/`: Fachkonzept und bestaetigter Umsetzungsplan.
@@ -88,6 +89,22 @@ Optional: `BULKEDIT_SESSION_TIMEOUT_MINUTES` (Standard 60),
 zurueck und stellt die Superuser-Rolle wieder her. Schemaaenderungen laufen
 ausschliesslich ueber neue Alembic-Revisionen; `python -m alembic check` und der Test
 `test_migrationen_passen_zu_modellen` pruefen den Gleichstand mit den Modellen.
+
+### pixx.io-Profil ohne Key im Terminal anlegen
+
+`create-profile` liest den API-Key aus einer Umgebungsvariablen oder aus `.env`, nie aus
+einem Argument. Ein erneuter Aufruf mit demselben Namen aktualisiert das Profil und
+rotiert damit auch den Key.
+
+```powershell
+.\.venv\Scripts\python.exe -m app create-profile --name test --host <host>.px.media `
+    --api-key-env PXTEST_API_KEY [--max-rows 5000] [--read-only] [--inactive]
+```
+
+Weitere Profile, Benutzer und Rechte verwaltet ein Superuser unter `/admin/profiles` und
+`/admin/users`. Der gespeicherte Key wird dort nur als Hint (`••••abcd`) angezeigt; ein
+leeres Key-Feld behaelt den bisherigen Key. "Verbindung testen" meldet den API-Benutzer
+und protokolliert das Ergebnis im Admin-Audit.
 
 ## Phase-1-Spike (nur lesend)
 

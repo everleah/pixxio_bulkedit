@@ -81,8 +81,8 @@ Default section order:
 
 ## Child DOX Index
 
-- `app/AGENTS.md`: Anwendungspaket (Konfiguration, Datenbank, Modelle, Rechte, CLI,
-  NiceGUI-Start).
+- `app/AGENTS.md`: Anwendungspaket (Konfiguration, Datenbank, Modelle, Rechte, Profile,
+  Client-Factory, CLI, NiceGUI-Start); `app/ui/AGENTS.md`: Seiten und Zugriffsschutz.
 - `plan/AGENTS.md`: Fachkonzept, bestaetigter Umsetzungsplan und deren Vorrangregeln.
 - `tests/AGENTS.md`: Offline-Tests der Anwendung und der Entwicklungsbasis.
 - Root-owned: `README.md`, `LICENSE`, `.gitignore`, `.env.example`, `requirements*.txt`,
@@ -104,6 +104,8 @@ Default section order:
 - Pflicht-Env der Anwendung sind `BULKEDIT_DB_PATH`, `BULKEDIT_MASTER_KEY` und
   `BULKEDIT_STORAGE_SECRET`; Datenbank und erster Superuser entstehen ueber
   `python -m app init-db` und `python -m app create-superuser --username ...`.
+- Ein pixx.io-Profil entsteht ueber `python -m app create-profile`; der API-Key kommt aus
+  einer Umgebungsvariablen oder aus `.env` (`--api-key-env`), nie aus einem Argument.
 - Vor Abschluss relevanter Aenderungen die in `README.md` dokumentierten Gates
   ausfuehren: `pip check`, Ruff-Lint, Ruff-Formatcheck, Pyright und pytest, jeweils
   ueber `.\.venv\Scripts\python.exe -m ...`.
