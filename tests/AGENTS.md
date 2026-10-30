@@ -29,10 +29,10 @@
   Vorlage, Rechte) und Vorlagen sowie der Kindprozess mit Zeitlimit.
 - `test_workspaces.py`: Normalisierung (Texte exakt, Datum/Zahl/Boolean/Auswahl),
   Schemaaufloesung und SchemaCache, Arbeitsbestaende (Snapshot, ChangeSet, Revision,
-  effektive Seiten mit Filter/Sortierung, Massenaktionen, Ablauf, Schliessen und
-  Wiedereroeffnen), die Spaltenauswahl (Speichern, Obergrenze, erhaltene
-  Script-Parameter, Ansicht folgt der Auswahl, sortierte Gruppen) und der Loader gegen
-  einen nachgebauten Client.
+  effektive Seiten mit Filter/Sortierung, Aenderungen in noch nicht geladenen Spalten,
+  Nachladen fehlender Spalten, Massenaktionen, Ablauf, Schliessen und Wiedereroeffnen),
+  die Spaltenauswahl (Speichern, Obergrenze, erhaltene Script-Parameter, Ansicht folgt der
+  Auswahl, sortierte Gruppen) und der Loader gegen einen nachgebauten Client.
 - `test_i18n.py`: Vollstaendigkeit des englischen Katalogs (jeder `t(...)`-Text muss
   uebersetzt sein), Platzhalterformatierung, Sprachumschaltung und Rueckfall auf Deutsch.
 - `test_writeplan.py`: Schreibplan aus dem ChangeSet (filesPut-Felder, Abschneiden leerer

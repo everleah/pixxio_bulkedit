@@ -194,6 +194,55 @@ def touch(session: Session, workspace: Workspace) -> None:
     session.flush()
 
 
+def snapshot_keys(session: Session, workspace: Workspace) -> set[str]:
+    """Spalten, die im Snapshot bereits vorliegen."""
+    asset = session.scalar(
+        select(WorkspaceAsset)
+        .where(WorkspaceAsset.workspace_id == workspace.id)
+        .order_by(WorkspaceAsset.position)
+        .limit(1)
+    )
+    if asset is None:
+        return set()
+    return set(json.loads(asset.values_json or "{}"))
+
+
+def missing_columns(
+    session: Session, workspace: Workspace, columns: Sequence[ColumnDef]
+) -> list[ColumnDef]:
+    """Spalten der Auswahl, die noch nicht im Snapshot stehen."""
+    present = snapshot_keys(session, workspace)
+    return [column for column in columns if column.key not in present]
+
+
+def merge_snapshot_values(
+    session: Session,
+    workspace: Workspace,
+    values_by_file: dict[int, dict[str, Any]],
+    keys: Sequence[str],
+) -> int:
+    """Ergaenzt fehlende Spalten im Snapshot; vorhandene Werte bleiben unveraendert."""
+    wanted = list(keys)
+    if not wanted:
+        return 0
+    updated = 0
+    for asset in session.scalars(
+        select(WorkspaceAsset).where(WorkspaceAsset.workspace_id == workspace.id)
+    ):
+        values = json.loads(asset.values_json or "{}")
+        source = values_by_file.get(int(asset.file_id), {})
+        added = {key: source.get(key) for key in wanted if key not in values}
+        if not added:
+            continue
+        values.update(added)
+        asset.values_json = json.dumps(values, ensure_ascii=False)
+        updated += 1
+    if updated:
+        workspace.updated_at = utc_now()
+    session.flush()
+    return updated
+
+
 def import_meta(workspace: Workspace) -> dict[str, Any] | None:
     """Metadaten eines Excel-Imports, sonst ``None``."""
     meta = _params_dict(workspace).get("xlsx")
@@ -601,8 +650,13 @@ def effective_page(
     filter_column: ColumnDef | None = None,
     filter_value: str = "",
     only_changed: bool = False,
+    columns: Sequence[ColumnDef] | None = None,
 ) -> WorkspacePage:
-    """Liest einen Block im effektiven Stand inklusive Trefferzahl."""
+    """Liest einen Block im effektiven Stand inklusive Trefferzahl.
+
+    Mit ``columns`` enthaelt die Antwort genau diese Spalten; Aenderungen aus dem ChangeSet
+    erscheinen auch dann, wenn die Spalte noch nicht im Snapshot steht.
+    """
     sort_column = sort_column or ColumnDef("std:fileName", "Dateiname", "file_attr", "text")
     params: dict[str, Any] = {"workspace_id": workspace.id}
     join_parts: list[str] = []
@@ -656,26 +710,27 @@ def effective_page(
     total = int(session.execute(count_statement, params).scalar_one() or 0)
     rows = session.execute(statement, params).mappings().all()
     file_ids = [int(row["file_id"]) for row in rows]
-    overrides: dict[tuple[int, str], Any] = {}
+    overrides: dict[int, dict[str, Any]] = {}
     if file_ids:
         for change in session.scalars(
             select(WorkspaceChange)
             .where(WorkspaceChange.workspace_id == workspace.id)
             .where(WorkspaceChange.file_id.in_(file_ids))
         ):
-            overrides[(int(change.file_id), str(change.field_key))] = _from_text(change.new_value)
+            overrides.setdefault(int(change.file_id), {})[str(change.field_key)] = _from_text(
+                change.new_value
+            )
+    keys = [column.key for column in columns] if columns else None
     payload = []
     for row in rows:
         file_id = int(row["file_id"])
         values = json.loads(row["values_json"])
-        effective = {
-            key: overrides.get((file_id, key), value) if (file_id, key) in overrides else value
-            for key, value in values.items()
-        }
+        merged = {**values, **overrides.get(file_id, {})}
+        shown = keys if keys is not None else list(merged)
         payload.append(
             {
                 "fileId": file_id,
-                **{key: display_value(value) for key, value in effective.items()},
+                **{key: display_value(merged.get(key)) for key in shown},
                 "__changed": bool(row["has_changes"]),
             }
         )
@@ -759,10 +814,13 @@ __all__ = [
     "list_workspaces",
     "load_assets",
     "mark_failed",
+    "merge_snapshot_values",
+    "missing_columns",
     "reopen_workspace",
     "resolve_targets",
     "revert_change",
     "set_change",
+    "snapshot_keys",
     "snapshot_value",
     "store_columns",
     "store_snapshot",

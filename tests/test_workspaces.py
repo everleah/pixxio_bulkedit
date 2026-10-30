@@ -389,6 +389,35 @@ def test_spaltenauswahl_hat_eine_obergrenze(session: Session, workspace: Workspa
     assert stored_columns(workspace) is None
 
 
+def test_aenderung_in_neuer_spalte_erscheint_im_block(
+    session: Session, workspace: Workspace, profile: Profile, owner: AppUser
+) -> None:
+    from app.workspaces import effective_page
+
+    late = ColumnDef(key="std:creator", label="Urheber", source="file_attr", edit_type="text")
+    set_change(session, workspace, file_id=1, column=late, value="Claudius", actor=owner)
+    page = effective_page(session, workspace, start=0, count=5, columns=[late])
+    row = next(item for item in page.rows if item["fileId"] == 1)
+    assert row["std:creator"] == "Claudius"
+    assert set(row) == {"fileId", "std:creator", "__changed"}
+
+
+def test_fehlende_spalten_werden_nachgeladen(session: Session, workspace: Workspace) -> None:
+    from app.workspaces import merge_snapshot_values, missing_columns
+
+    late = ColumnDef(key="std:creator", label="Urheber", source="file_attr", edit_type="text")
+    present = ColumnDef(key="std:subject", label="Titel", source="file_attr", edit_type="text")
+    assert [column.key for column in missing_columns(session, workspace, [late])] == ["std:creator"]
+    assert missing_columns(session, workspace, [present]) == []
+    updated = merge_snapshot_values(
+        session, workspace, {1: {"std:creator": "Claudius"}}, ["std:creator", "std:subject"]
+    )
+    assert updated == 3
+    assert snapshot_value(session, workspace.id, 1, "std:creator") == "Claudius"
+    assert snapshot_value(session, workspace.id, 1, "std:subject") == "Zebra"
+    assert missing_columns(session, workspace, [late]) == []
+
+
 def test_ansicht_folgt_der_spaltenauswahl(
     session: Session, workspace: Workspace, profile: Profile
 ) -> None:

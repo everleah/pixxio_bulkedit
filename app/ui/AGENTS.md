@@ -127,6 +127,10 @@
 - `grouped_columns` sortiert je Gruppe nach Anzeigename (`column_sort_key`: Umlaute
   zaehlen wie ihr Grundbuchstabe, danach `casefold`). Die gespeicherte Reihenfolge ist die
   Reihenfolge im Dialog, damit Grid und Excel-Export dieselbe Sortierung zeigen.
+- Nach "Uebernehmen" laedt die Seite Werte fuer Spalten nach, die noch nicht im Snapshot
+  stehen (`missing_columns` + `read_files` in `run.io_bound`, dann
+  `merge_snapshot_values`), und laedt erst danach neu. Ohne diesen Schritt blieben neue
+  Spalten leer und Bearbeitungen darin unsichtbar.
 
 ## Work Guidance
 

@@ -23,7 +23,15 @@ from app.colors import PALETTE, TEXT_STYLE
 from app.crypto import SecretBox
 from app.db import SessionFactory, session_scope
 from app.i18n import describe_error, get_locale, t
-from app.models import AppUser, Profile, QueryScript, QueryScriptVersion, Role, Workspace
+from app.models import (
+    AppUser,
+    Profile,
+    QueryScript,
+    QueryScriptVersion,
+    Role,
+    Workspace,
+    WorkspaceAsset,
+)
 from app.models.enums import RunSource, WorkspaceStatus
 from app.schema import ColumnDef, ProfileSchema, SchemaCache, resolve_columns
 from app.scripts.contract import coerce_params
@@ -55,6 +63,8 @@ from app.workspaces import (
     expiry_warning_days,
     list_workspaces,
     load_assets,
+    merge_snapshot_values,
+    missing_columns,
     reopen_workspace,
     resolve_targets,
     set_change,
@@ -400,6 +410,7 @@ def register_workspace_pages(
                 filter_column=filter_column,
                 filter_value=params.get("filter") or "",
                 only_changed=(params.get("onlyChanged") or "0") == "1",
+                columns=columns,
             )
         return JSONResponse({"rows": page.rows, "rowCount": page.total, "revision": page.revision})
 
@@ -1108,7 +1119,40 @@ def register_workspace_pages(
                 built["bulk"] = False
             _refresh_counter()
 
-        def _apply_columns() -> None:
+        async def _load_missing(profile_row: Profile, wanted: Sequence[ColumnDef]) -> int:
+            """Laedt Werte nach, die fuer die neue Auswahl noch im Snapshot fehlen."""
+            from app.writer import read_files
+
+            def job() -> int:
+                with session_scope(session_factory) as session:
+                    current = session.get(Workspace, workspace_id)
+                    if current is None:
+                        return 0
+                    missing = missing_columns(session, current, wanted)
+                    if not missing:
+                        return 0
+                    client = client_factory.client_for(profile_row)
+                    ids = [
+                        int(value)
+                        for value in session.scalars(
+                            select(WorkspaceAsset.file_id).where(
+                                WorkspaceAsset.workspace_id == current.id
+                            )
+                        )
+                    ]
+                    data = read_files(client, missing, ids)
+                    values = {file_id: item["values"] for file_id, item in data.items()}
+                    return merge_snapshot_values(
+                        session, current, values, [column.key for column in missing]
+                    )
+
+            try:
+                return await run.io_bound(job) or 0
+            except Exception as exc:  # noqa: BLE001 - Nachladen ist eine Zugabe
+                ui.notify(describe_error(exc), color="warning")
+                return 0
+
+        async def _apply_columns() -> None:
             keys = _chosen_keys()
             with session_scope(session_factory) as session:
                 current = session.get(Workspace, workspace_id)
@@ -1119,8 +1163,13 @@ def register_workspace_pages(
                 except WorkspaceError as exc:
                     ui.notify(describe_error(exc), color="negative")
                     return
+                profile_row = session.get(Profile, current.profile_id)
+                known = {column.key: column for column in all_columns}
+                wanted = [known[key] for key in stored if key in known]
             column_dialog.close()
             ui.notify(t("{count} Spalten übernommen.", count=len(stored)))
+            if profile_row is not None:
+                await _load_missing(profile_row, wanted)
             ui.navigate.reload()
 
         def _reset_columns() -> None:

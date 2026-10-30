@@ -148,6 +148,14 @@
   damit die korrigierte Datei erneut importiert werden kann.
 - Werte im effektiven Stand immer als `CASE WHEN change.id IS NOT NULL THEN change.new_value
   ELSE json_extract(...) END` ausdruecken; `COALESCE` wuerde geleerte Werte falsch aufloesen.
+- `effective_page` gibt mit `columns` genau die angezeigten Spalten zurueck und mischt
+  ChangeSet-Werte auch fuer Schluessel ein, die noch nicht im Snapshot stehen. Sonst
+  wuerde eine Bearbeitung in einer nachtraeglich gewaehlten Spalte im Grid sofort wieder
+  verschwinden.
+- Wird die Spaltenauswahl erweitert, laedt die Oberflaeche die fehlenden Spalten ueber
+  `read_files` nach und ergaenzt sie mit `merge_snapshot_values` im Snapshot — nur
+  fehlende Schluessel, vorhandene Werte bleiben unveraendert (der Diff-Basisstand darf
+  nicht kippen). `missing_columns` ermittelt den Bedarf aus dem ersten Asset.
 - Spaltenkennungen sind durchgaengig `std:<attribut>`, `custom:<feld-id>` oder
   `standard:<feld-id>`; Namen aus `COLUMNS` loest `app/schema.py` vor dem Speichern auf.
 - Der Snapshot (`workspace_asset.values_json`) haelt Anzeigenormalform; das ChangeSet nur

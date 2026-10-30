@@ -186,7 +186,9 @@ Namen vor dem Senden auf.
   „Übernehmen". Die Auswahl gilt nur für diesen Arbeitsbestand, wird in `params_json`
   gespeichert (höchstens 80 Spalten) und wirkt auch auf Filter, Sortierung und
   Excel-Export. „Zurücksetzen" stellt die Script- beziehungsweise Standardspalten wieder
-  her; die Spaltenreihenfolge im Grid folgt der Reihenfolge im Dialog.
+  her; die Spaltenreihenfolge im Grid folgt der Reihenfolge im Dialog. Werte für neu
+  hinzugekommene Spalten werden beim Übernehmen aus pixx.io nachgeladen, damit die Zellen
+  sofort gefüllt sind und Bearbeitungen darin sichtbar bleiben.
 
   > Hinweis: Ein Profil kann sehr viele Standard-Metadatenfelder mitbringen (im
   > Testsystem rund 390). Ohne Feldfilter ist die Liste lang; „Alle" wählt dann nur bis
