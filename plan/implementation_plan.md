@@ -165,8 +165,13 @@ ergaenzt werden; eine Collection allein bleibt keine Schutzgrenze.
   Asset gefuehrten Standardfelder (z. B. `AltTextAccessibility`, `Caption-Abstract`);
   XMP-/AO-/AI-Felder melden `does not exist or is not editable`. Die Editierbarkeit
   ist im Schema nicht erkennbar.
-- `filesDelete` nennt die geloeschten IDs nicht zuverlaessig; die Loeschung ist ueber
-  eine Collection-Abfrage inklusive Archiv zu verifizieren.
+- Der Client-Default `pageSize=100` liess `CustomMetadata.get_all()` und
+  `CustomMetadataBuilder` scheitern (`customMetadata` erlaubt 50). Das war ein
+  Client-Fehler und ist in `pixxio-client 0.4.4` behoben (`_max_page_size` je Resource).
+- `filesDelete`: eine ID wird synchron mit `success` beantwortet, ohne IDs; mehrere IDs
+  starten einen Job, dessen `finishedJobData` `deletedFileIDs` und `notDeletedFileIDs`
+  enthaelt. Seit `pixxio-client 0.4.4` liefert `File.delete_and_wait()` den Job; vorher
+  fehlte der Wartehelfer und die `delete()`-Doku nannte die IDs faelschlich in der Antwort.
 - Die Testcollection `chub` (id 614405567) ist statisch und enthaelt 4 Assets mit
   19 Custom- und 376 Standard-Metadatenfeldern; die Custom-Felder sind derzeit leer.
 

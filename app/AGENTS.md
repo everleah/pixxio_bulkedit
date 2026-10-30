@@ -43,7 +43,9 @@
 - Ein unlesbares Ledger wird nie stillschweigend zurueckgesetzt, sondern als Fehler
   gemeldet.
 - Standard-Metadaten nur auf Feldern schreiben, die das Asset fuehrt; die Editierbarkeit
-  ist im Schema nicht erkennbar.
+  ist im Schema nicht erkennbar und muss aus der API-Antwort gelernt werden.
+- `CustomMetadataBuilder` des Clients ist ab `pixxio-client 0.4.4` nutzbar; im Spike
+  werden Eintraege trotzdem aus dem bereits geladenen Schema gebaut (kein zweiter Abruf).
 - `pageSize`: `files` bis 500, `customMetadata` bis 50, `standardMetadata` ohne Paging
   (`FILES_PAGE_SIZE`/`METADATA_PAGE_SIZE` aus `app/spike/client.py` nutzen).
 

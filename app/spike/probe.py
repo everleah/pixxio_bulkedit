@@ -127,8 +127,9 @@ def build_metadata_entries(
 ) -> list[dict[str, Any]]:
     """Baut metadataCustom-/metadataStandard-Eintraege ueber den Client-Builder.
 
-    ``CustomMetadataBuilder`` ist hier nicht nutzbar: er ruft ``get_all()`` mit dem
-    Client-Default 100 ab, den die API (Maximum 50) ablehnt.
+    Die Feldliste stammt aus dem bereits geladenen Schema, damit kein zweiter
+    Schemaabruf noetig ist. ``CustomMetadataBuilder`` funktioniert ab
+    pixxio-client 0.4.4 (vorher scheiterte er am pageSize-Limit von 50).
     """
     builder = MetadataValueBuilder([SimpleNamespace(**field) for field in fields])
     for action, field_id, value in entries:
@@ -276,6 +277,10 @@ def create_fixtures(
     return created
 
 
+def _id_list(value: Any) -> list[int]:
+    return [int(item) for item in (as_plain(value) or []) if isinstance(item, int | str)]
+
+
 def cleanup_fixtures(client: Client, settings: SpikeSettings, ledger: Ledger) -> list[int]:
     """Loescht die Assets aus dem Ledger und entfernt sie danach aus dem Ledger."""
     if not settings.is_dev:
@@ -288,18 +293,31 @@ def cleanup_fixtures(client: Client, settings: SpikeSettings, ledger: Ledger) ->
         ledger_ids=set(targets),
         targets=targets,
     )
-    response = as_dict(File(client).delete(ids=targets))
-    # Die Antwort nennt nicht zuverlaessig die geloeschten IDs; deshalb wird ueber die
-    # Collection geprueft (inklusive archivierter Assets).
-    still_present = set(targets) & fetch_collection_ids(
-        client, settings.collection_id, include_archived=True
+    response = as_dict(
+        File(client).delete_and_wait(
+            ids=targets,
+            timeout=JOB_TIMEOUT_SECONDS,
+            poll_interval=POLL_INTERVAL_SECONDS,
+        )
     )
-    deleted = [asset_id for asset_id in targets if asset_id not in still_present]
+    job_data = as_dict(response.get("finishedJobData") or {})
+    if job_data:
+        # Mehrere IDs: die API meldet die IDs im abgeschlossenen Job.
+        deleted = _id_list(job_data.get("deletedFileIDs"))
+        still_present = sorted(_id_list(job_data.get("notDeletedFileIDs")))
+    else:
+        # Eine ID: die API meldet nur success; Loeschung ueber die Collection pruefen.
+        remaining = set(targets) & fetch_collection_ids(
+            client, settings.collection_id, include_archived=True
+        )
+        deleted = [asset_id for asset_id in targets if asset_id not in remaining]
+        still_present = sorted(remaining)
+
     for asset_id in deleted:
         ledger.remove(asset_id)
     if still_present:
         raise SpikeError(
-            f"Noch vorhandene Assets bleiben im Ledger: {sorted(still_present)}; "
+            f"Noch vorhandene Assets bleiben im Ledger: {still_present}; "
             f"Antwortfelder: {sorted(response)}"
         )
     return deleted

@@ -97,7 +97,7 @@ Default section order:
   `requirements-dev.lock.txt` ist der gepruefte Windows-/Python-3.14-Snapshot.
 - Fuer pixxio-client immer die aktuelle stabile PyPI-Version verwenden, kein internes
   Wheel und keine Installation aus dem Nachbarprojekt. Bei Einrichtung und Updates
-  explizit `pip install --upgrade --index-url https://pypi.org/simple pixxio-client`
+  explizit `pip install --upgrade --no-cache-dir --index-url https://pypi.org/simple pixxio-client`
   ausfuehren. Den Client auch im Lock-Snapshot ungepinnt lassen; nach Updates Gates pruefen.
 - Ruff und Pyright werden in `pyproject.toml` konfiguriert; Pylance nutzt dieselbe
   Typpruefbasis. VS Code analysiert den gesamten Workspace.

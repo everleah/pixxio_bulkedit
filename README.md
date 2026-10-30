@@ -13,7 +13,7 @@ Die Umgebung ist von anderen Projekten isoliert.
 ```powershell
 py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.lock.txt
-.\.venv\Scripts\python.exe -m pip install --upgrade --index-url https://pypi.org/simple pixxio-client
+.\.venv\Scripts\python.exe -m pip install --upgrade --no-cache-dir --index-url https://pypi.org/simple pixxio-client
 ```
 
 Der Lock-Snapshot enthaelt die unter Windows mit Python 3.14 installierten direkten
@@ -26,7 +26,7 @@ sauberen Umgebung installieren, alle Gates pruefen und den Snapshot aktualisiere
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m pip install --upgrade --index-url https://pypi.org/simple pixxio-client
+.\.venv\Scripts\python.exe -m pip install --upgrade --no-cache-dir --index-url https://pypi.org/simple pixxio-client
 $snapshot = .\.venv\Scripts\python.exe -m pip freeze --exclude pixxio-client
 @($snapshot; "pixxio-client") | Set-Content -Encoding UTF8 requirements-dev.lock.txt
 ```
@@ -38,11 +38,13 @@ Client-Quelle ist ausschliesslich die aktuelle stabile Veroeffentlichung von
 [pixxio-client auf PyPI](https://pypi.org/project/pixxio-client/), ohne `--pre`.
 Interne Wheels und bearbeitbare Installationen des Nachbarprojekts entfallen.
 Nach jedem Update die Gates ausfuehren und die tatsaechlich eingesetzte Version fuer
-Abnahmen dokumentieren. Lokal vorhandene, unveroeffentlichte Client-Funktionen
+Abnahmen dokumentieren. `--no-cache-dir` ist noetig, weil pip sonst eine
+zwischengespeicherte, veraltete Version installiert, obwohl auf PyPI bereits ein
+neueres Release liegt. Lokal vorhandene, unveroeffentlichte Client-Funktionen
 duerfen nicht als auf PyPI verfuegbar vorausgesetzt werden. Updates erfolgen bewusst
 bei Einrichtung beziehungsweise Wartung, nicht automatisch beim App-Start.
 
-Fuer Abnahmen dokumentierter Stand: `pixxio-client 0.4.3` (PyPI, 30.10.2026).
+Fuer Abnahmen dokumentierter Stand: `pixxio-client 0.4.4` (PyPI, 30.10.2026).
 
 ## Projektstruktur
 
