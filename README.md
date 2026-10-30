@@ -87,6 +87,32 @@ zurueck und stellt die Superuser-Rolle wieder her. Schemaaenderungen laufen
 ausschliesslich ueber neue Alembic-Revisionen; `python -m alembic check` und der Test
 `test_migrationen_passen_zu_modellen` pruefen den Gleichstand mit den Modellen.
 
+## Phase-1-Spike (nur lesend)
+
+Die Machbarkeitspruefungen nutzen eigene Variablen und beruehren die
+Anwendungskonfiguration nicht:
+
+| Variable | Zweck |
+|---|---|
+| `PXTEST_HOST` | Host des Testsystems |
+| `PXTEST_API_KEY` | API-Key des Testsystems (nie im Repo) |
+| `PXTEST_COLLECTION_ID` | Collection fuer die Pruefungen |
+| `PXTEST_IS_DEV` | `true` nur auf einem Testsystem; Voraussetzung fuer Testdaten |
+
+```powershell
+.\.venv\Scripts\python.exe -m app.spike report
+.\.venv\Scripts\python.exe -m app.spike whoami
+.\.venv\Scripts\python.exe -m app.spike collection
+.\.venv\Scripts\python.exe -m app.spike schema --json
+.\.venv\Scripts\python.exe -m app.spike files --limit 10
+```
+
+`report` ruft API-Benutzer, Collection, Schema und Beispieldateien ab und zeigt
+Laufzeiten; `--json` liefert maschinenlesbare Ausgabe. Es wird ausschliesslich
+gelesen. Schreibpruefungen folgen spaeter und duerfen nur Assets betreffen, die der
+Spike selbst anlegt: IDs im lokalen Ledger, zusaetzlich Mitgliedschaft in
+`PXTEST_COLLECTION_ID`, nur bei `PXTEST_IS_DEV=true`.
+
 ## Code-Quality-Gates
 
 Die empfohlenen VS-Code-Erweiterungen sind Python, Pylance und Ruff.

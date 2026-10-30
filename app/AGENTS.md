@@ -19,6 +19,8 @@
   Schutz des letzten aktiven Superusers.
 - `colors.py`: Meadow-Palette und WCAG-Kontrastberechnung.
 - `cli.py` mit `__main__.py`: `init-db`, `generate-master-key`, `create-superuser`, `serve`.
+- `spike/`: Machbarkeitspruefungen der Phase 1 gegen ein Testsystem, ausschliesslich
+  lesend (`settings.py` fuer `PXTEST_*`, `client.py`, `discovery.py`, `cli.py`).
 - `main.py`: NiceGUI-Start, Anmeldung und Session-Ablauf.
 - `alembic.ini` und `migrations/`: root-owned; Schemaaenderungen laufen ausschliesslich
   ueber Alembic-Revisionen.
@@ -33,6 +35,10 @@
 - Zeitstempel werden in UTC ueber `utc_now` geschrieben.
 - Fachliche Kennungen englisch im Code; Docstrings und UI-Texte deutsch.
 - Keine Live-Schreibaufrufe gegen pixx.io ohne freigegebene File-ID-Liste.
+- `app/spike/` ist ausschliesslich lesend. Schreibpruefungen duerfen nur Assets
+  betreffen, die der Spike selbst anlegt (Ledger plus Mitgliedschaft in
+  `PXTEST_COLLECTION_ID`), und nur bei `PXTEST_IS_DEV=true`.
+- `pageSize` der API ist auf 50 begrenzt; `PAGE_SIZE` aus `app/spike/client.py` nutzen.
 
 ## Work Guidance
 

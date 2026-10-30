@@ -13,6 +13,8 @@
 - `test_settings.py`, `test_crypto.py`, `test_auth.py`, `test_db.py`, `test_cli.py`,
   `test_colors.py`: Konfiguration, Verschluesselung, Rollen und Rechte, Datenbank und
   Migrationen, Kommandozeile, Farbkontrast.
+- `test_spike.py`: Phase-1-Spikepruefungen ohne Netzzugriff; die `summarize_*`-Funktionen
+  arbeiten auf nachgebauten Antwortobjekten.
 
 ## Local Contracts
 

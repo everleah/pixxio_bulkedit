@@ -133,9 +133,26 @@ Auf ausschliesslich freigegebenen Produktiv-Test-Assets:
 - Job-Endzustaende, Teilfehler und verfuegbare Fehlerdetails.
 - Rate-Limits und ausgeloeste Webhooks.
 
-**Schreibschutz:** Testlaeufe duerfen ausschliesslich eine explizite
-File-ID-Freigabeliste verwenden. Jede Ziel-ID wird vor dem Schreiben geprueft;
-ein Collection-Name allein ist keine ausreichende Schutzgrenze.
+**Schreibschutz (Festlegung 30.10.2026):** Geschrieben wird ausschliesslich auf
+Assets, die der Spike selbst auf dem Testsystem angelegt hat. Deren IDs werden in
+einem lokalen Ledger protokolliert; jede Ziel-ID wird vor dem Schreiben gegen dieses
+Ledger und zusaetzlich gegen die Mitgliedschaft in `PXTEST_COLLECTION_ID` geprueft.
+Dateianlage und -loeschung sind nur bei `PXTEST_IS_DEV=true` erlaubt und dienen
+allein der Testdatenvorbereitung. Manuell freigegebene File-IDs koennen spaeter
+ergaenzt werden; eine Collection allein bleibt keine Schutzgrenze.
+
+**Erste Befunde (Test-System `hoerl-demo.px.media`, Client 0.4.3):**
+
+- `pageSize` ist auf 50 begrenzt; der Client-Default 100 wird abgelehnt.
+- `CustomMetadata.get_all()` liefert `editType` und Auswahloptionen erst nach
+  `set_response_fields(["id", "name", "editType", "selectionOptions"])`.
+- Die Einzelabfrage einer Collection liefert `isDynamic` und `filesQuantity` nicht;
+  beide kommen ueber die Listenabfrage mit Response-Feldern.
+- `users/current` liefert `{success, user: {id, displayName}}`.
+- Der Client wiederholt GET/PUT/DELETE bei 429/503, POST nie. Fuer den Writer ist
+  deshalb zu entscheiden, ob PUT-Wiederholungen unklare Ergebnisse wiederholen.
+- Die Testcollection `chub` (id 614405567) ist statisch und enthaelt 4 Assets mit
+  19 Custom- und 376 Standard-Metadatenfeldern; die Custom-Felder sind derzeit leer.
 
 ### 6.2 Grid-Prototyp
 
