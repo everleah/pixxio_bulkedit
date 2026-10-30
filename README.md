@@ -148,6 +148,30 @@ Metadatenfilter (`metadata_text`, `metadata_selection`, `metadata_date`,
 `has_metadata_field`) akzeptieren eine Feld-ID oder einen Feldnamen; die Fassade loest
 Namen vor dem Senden auf.
 
+## Arbeitsbestaende und Grid
+
+`/workspaces` laedt die Assets eines veroeffentlichten Scripts (Parameterformular aus
+`PARAMS`) in einen Arbeitsbestand: Snapshot der geladenen Werte plus ChangeSet der
+Aenderungen, beides in der Anwendungsdatenbank. `/workspaces/{id}` zeigt das Grid.
+
+- Spalten kommen aus `COLUMNS` des Scripts (`std:subject`, `custom:Kampagne`,
+  `standard:DateSent`); ohne `COLUMNS` erscheinen Dateiname, Titel, Beschreibung und bis
+  zu zwoelf Custom-Felder.
+- Editoren je Typ: Text, Zahl, Datum (`JJJJ-MM-TT HH:MM:SS`), Wahrheitswert,
+  Auswahlliste; `map`/`focalpoint`/`orientation` und `std:fileName` sind nur lesbar.
+- Texte werden exakt gespeichert (kein Trimmen). Geaenderte Zellen sind gruen markiert,
+  betroffene Zeilen tragen eine Markierung am linken Rand.
+- Toolbar: Wertfilter auf einer Spalte, `nur geaenderte Zeilen`, Sortierung auf- und
+  absteigend, Spalten an Inhalt/Anzeige anpassen, Massenwert fuer markierte/gefilterte/
+  alle Zeilen, Aenderungen verwerfen, Arbeitsbestand schliessen.
+- `GET /workspace/rows` liefert den effektiven Stand (ChangeSet vor Snapshot) mit
+  Trefferzahl und Revision; `GET /workspace/changes` die geaenderten Zellen je Asset.
+- Jede Aenderung erhoeht `edit_revision`. Sieht ein Tab eine neuere Revision, erscheint
+  der Hinweis "in einem anderen Tab geaendert"; Schreibversuche mit veralteter Revision
+  werden abgelehnt.
+- Entwuerfe laufen nach 30 Tagen Inaktivitaet ab; ab sieben Resttagen warnt die Liste.
+  Schliessen entfernt den Arbeitsbestand aus der Liste, Loeschen entfernt ihn ganz.
+
 ## Phase-1-Spike (nur lesend)
 
 Die Machbarkeitspruefungen nutzen eigene Variablen und beruehren die

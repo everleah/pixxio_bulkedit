@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import delete, func, insert, select, text
 from sqlalchemy.orm import Session
 
+from app.clients import plain
 from app.models import (
     AppUser,
     Profile,
@@ -25,7 +26,7 @@ from app.models import (
     WorkspaceAsset,
     WorkspaceChange,
 )
-from app.models.base import utc_now
+from app.models.base import as_utc, utc_now
 from app.models.enums import WorkspaceStatus
 from app.normalize import canonical, display_value, is_empty, values_equal
 from app.schema import ColumnDef
@@ -108,7 +109,7 @@ def expiry_warning_days(workspace: Workspace, now: datetime | None = None) -> in
     if workspace.expires_at is None:
         return None
     current = now or utc_now()
-    remaining = (workspace.expires_at - current).days
+    remaining = (as_utc(workspace.expires_at) - as_utc(current)).days
     return remaining if remaining <= EXPIRY_WARNING_DAYS else None
 
 
@@ -247,7 +248,8 @@ def _append_row(
     seen: set[int],
     max_rows: int,
 ) -> None:
-    file_id = int(item.id)
+    payload = plain(item)
+    file_id = int(payload.get("id"))
     if file_id in seen:
         return
     seen.add(file_id)
@@ -255,33 +257,28 @@ def _append_row(
         raise WorkspaceError(
             f"Die Ergebnismenge ueberschreitet das Profillimit von {max_rows} Zeilen."
         )
-    values: dict[str, Any] = {}
-    metadata = {
-        str(key): value for key, value in (getattr(item, "metadataFields", None) or {}).items()
-    }
-    for column in columns:
-        values[column.key] = _read_value(item, column, metadata)
+    metadata = payload.get("metadataFields") or {}
+    values = {column.key: _read_value(payload, column, metadata) for column in columns}
     rows.append(
         AssetRow(
             file_id=file_id,
-            modify_date=_text(getattr(item, "modifyDate", None)),
+            modify_date=_text(payload.get("modifyDate")),
             values=values,
         )
     )
 
 
-def _read_value(item: Any, column: ColumnDef, metadata: dict[str, Any]) -> Any:
+def _read_value(payload: dict[str, Any], column: ColumnDef, metadata: dict[str, Any]) -> Any:
     if column.source == "file_attr":
         attribute = column.key.split(":", 1)[1]
-        raw = getattr(item, attribute, None)
+        raw = payload.get(attribute)
         if attribute == "keywords":
             raw = raw or []
         return _canonical_safe(column, raw)
     entry = metadata.get(str(column.field_id))
-    if entry is None:
+    if not isinstance(entry, dict):
         return None
-    value = entry.get("value") if isinstance(entry, dict) else getattr(entry, "value", None)
-    return _canonical_safe(column, value)
+    return _canonical_safe(column, entry.get("value"))
 
 
 def _canonical_safe(column: ColumnDef, value: Any) -> Any:
@@ -530,13 +527,27 @@ def effective_page(
     )
     total = int(session.execute(count_statement, params).scalar_one() or 0)
     rows = session.execute(statement, params).mappings().all()
+    file_ids = [int(row["file_id"]) for row in rows]
+    overrides: dict[tuple[int, str], Any] = {}
+    if file_ids:
+        for change in session.scalars(
+            select(WorkspaceChange)
+            .where(WorkspaceChange.workspace_id == workspace.id)
+            .where(WorkspaceChange.file_id.in_(file_ids))
+        ):
+            overrides[(int(change.file_id), str(change.field_key))] = _from_text(change.new_value)
     payload = []
     for row in rows:
+        file_id = int(row["file_id"])
         values = json.loads(row["values_json"])
+        effective = {
+            key: overrides.get((file_id, key), value) if (file_id, key) in overrides else value
+            for key, value in values.items()
+        }
         payload.append(
             {
-                "fileId": int(row["file_id"]),
-                **{key: display_value(value) for key, value in values.items()},
+                "fileId": file_id,
+                **{key: display_value(value) for key, value in effective.items()},
                 "__changed": bool(row["has_changes"]),
             }
         )

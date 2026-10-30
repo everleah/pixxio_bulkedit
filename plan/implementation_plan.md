@@ -356,7 +356,15 @@ Umgesetzt (30.10.2026, Backend): `app/schema.py` (Spaltenkennungen `std:*`, `cus
 `workspace_asset.values_json`, ChangeSet nur fuer abweichende Zellen, effektive Seiten mit
 Filter/Sortierung/`nur geänderte Zeilen`, Massenaktionen, Zielauflösung, Ablauf nach 30
 Tagen, `edit_revision` fuer mehrere Tabs, `load_assets` fuer Filter- und ID-Ergebnisse).
-Die Grid-Oberflaeche folgt als naechster Schritt.
+
+Umgesetzt (30.10.2026, Oberflaeche): `/workspaces` laedt aus einem veroeffentlichten Script
+mit Parameterformular in einen neuen Arbeitsbestand und listet offene Entwuerfe mit
+Zeilen-, Aenderungs- und Ablaufinfo; `/workspaces/{id}` zeigt ein AG Grid (Infinite Row
+Model, `GET /workspace/rows`) mit Editoren je Feldtyp, Zell-/Zeilenhervorhebung,
+Wertfilter, `nur geaenderte Zeilen`, Sortierung, Massenwert fuer markierte/gefilterte/alle
+Zeilen, Verwerfen und Schliessen. Live geprueft: 4 Assets aus Collection `chub`, Zelledit
+(Revision 1), Filter (1 Treffer), Bulk-Wert (Revision 2), Verwerfen (Revision 3) und
+Mehr-Tab-Warnung.
 
 ### Massenaktionen
 

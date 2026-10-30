@@ -17,6 +17,10 @@
 - `scripts.py`: `register_script_pages` registriert `/scripts` (Liste, Vorlagen kopieren)
   und `/scripts/{script_id}` (Editor mit `ui.codemirror`, Parameterformular aus `PARAMS`,
   Pruefen, Dry Run, Speichern, Veroeffentlichen; `script_id = 0` legt neu an).
+- `workspaces.py`: `register_workspace_pages` registriert `/workspaces` (Laden aus einem
+  veroeffentlichten Script, Liste offener Entwuerfe) und `/workspaces/{id}` (AG Grid mit
+  Infinite Row Model). Daten liefern `GET /workspace/rows` (effektiver Stand, Filter,
+  Sortierung, `onlyChanged`) und `GET /workspace/changes` (geaenderte Zellen je Asset).
 
 ## Local Contracts
 
@@ -35,6 +39,15 @@
   API-Key wird nur fuer den Aufruf entschluesselt und nie angezeigt oder protokolliert.
 - Bearbeiten koennen nur Benutzer mit `can_edit_scripts`; alle anderen sehen
   ausschliesslich Pruefen, Dry Run und die Versionsauswahl.
+- Das Grid liest ausschliesslich ueber den Endpunkt im effektiven Stand; Aenderungen
+  schreibt die Seite direkt ueber `set_change` und sendet dazu die zuletzt gesehene
+  `edit_revision`. Eine veraltete Revision meldet der Service als Konflikt; die Seite
+  zeigt dann den Hinweis "in einem anderen Tab geaendert" und verlangt ein Neuladen.
+- Zellhervorhebung und Zeilenmarkierung laufen ueber AG-Grid-Ausdruecke
+  (`cellClassRules`, `rowClassRules`) mit `!!data && ...`, weil AG Grid die Regeln auch
+  fuer noch nicht geladene Zeilen auswertet.
+- Nach jeder Aenderung: `/workspace/changes` neu laden, `purgeInfiniteCache` ausfuehren und
+  den Statustext (Zeilen, Aenderungen, Revision) neu setzen.
 
 ## Work Guidance
 
@@ -53,6 +66,9 @@
 - Als Nicht-Superuser dieselben Pfade aufrufen: "Kein Zugriff" ohne Datenabruf.
 - `/scripts` als Superuser und als Viewer aufrufen; der Viewer darf keinen
   Speichern-Knopf sehen, aber einen Dry Run ausfuehren.
+- `/workspaces`: bestehenden Arbeitsbestand oeffnen, eine Zelle bearbeiten (Status zeigt
+  eine Aenderung und eine hoehere Revision), "nur geaenderte Zeilen" sowie Wertfilter
+  pruefen, Bulk-Wert setzen und Aenderungen verwerfen.
 
 ## Child DOX Index
 

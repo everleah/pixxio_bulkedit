@@ -15,6 +15,7 @@ from typing import Any, Literal
 from pixxio_client import Client
 from pixxio_client.metadata import CustomMetadata, StandardMetadata
 
+from app.clients import response_mapping
 from app.crypto import SecretBox
 from app.models import Profile
 from app.scripts.errors import ScriptExecutionError
@@ -161,27 +162,16 @@ def fetch_metadata_fields(client: Client) -> list[dict[str, Any]]:
     custom = CustomMetadata(client)
     custom.set_response_fields(FIELD_RESPONSE_FIELDS)
     fields = [
-        {"kind": "custom", **_plain(item)}
+        {"kind": "custom", **response_mapping(item)}
         for item in custom.iter_all(page_size=CUSTOM_PAGE_SIZE, max_items=FIELD_LIMIT)
     ]
     standard = StandardMetadata(client)
     standard.set_response_fields(["id", "name", "editType"])
     fields.extend(
-        {"kind": "standard", **_plain(item)}
+        {"kind": "standard", **response_mapping(item)}
         for item in standard.iter_all(page_size=STANDARD_PAGE_SIZE, max_items=FIELD_LIMIT)
     )
     return fields
-
-
-def _plain(value: object) -> dict[str, Any]:
-    to_dict = getattr(value, "to_dict", None)
-    if callable(to_dict):
-        result = to_dict()
-        if isinstance(result, dict):
-            return dict(result)
-    if isinstance(value, dict):
-        return dict(value)
-    return {}
 
 
 def build_schema(fields: list[dict[str, Any]]) -> ProfileSchema:

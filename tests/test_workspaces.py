@@ -355,6 +355,25 @@ def test_filter_sieht_aenderungen(session: Session, workspace: Workspace) -> Non
     )
     assert [row["fileId"] for row in page.rows] == [3]
     assert page.total == 1
+    assert page.rows[0]["custom:4711"] == "Treffer"
+
+
+def test_zeilen_zeigen_den_effektiven_wert(session: Session, workspace: Workspace) -> None:
+    set_change(session, workspace, file_id=1, column=FIELD_TEXT, value="Neu")
+    page = effective_page(session, workspace, count=10)
+    row = next(item for item in page.rows if item["fileId"] == 1)
+    assert row["custom:4711"] == "Neu"
+
+    # Zeile 3 hat keinen Wert: ein Leeren ist keine Aenderung.
+    cleared = set_change(session, workspace, file_id=3, column=FIELD_TEXT, value="")
+    assert cleared is False
+
+    set_change(session, workspace, file_id=3, column=FIELD_SUBJECT, value="Geaendert")
+    page = effective_page(session, workspace, count=10)
+    row = next(item for item in page.rows if item["fileId"] == 3)
+    assert row["std:subject"] == "Geaendert"
+    assert row["custom:4711"] == ""
+    assert row["__changed"] is True
 
 
 def test_nur_geaenderte_zeilen(session: Session, workspace: Workspace) -> None:
@@ -416,6 +435,15 @@ class _FakeFile:
         self.subject = subject
         self.keywords = []
         self.metadataFields = {"4711": {"name": "Kampagne", "value": campaign}}
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "modifyDate": self.modifyDate,
+            "subject": self.subject,
+            "keywords": list(self.keywords),
+            "metadataFields": {key: dict(value) for key, value in self.metadataFields.items()},
+        }
 
 
 def _fake_files(monkeypatch: pytest.MonkeyPatch, items: list[_FakeFile]) -> list[dict[str, Any]]:

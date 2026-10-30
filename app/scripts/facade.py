@@ -17,6 +17,7 @@ from pixxio_client.exceptions import PIXXIOException
 from pixxio_client.files import File
 from pixxio_client.metadata import CustomMetadata, StandardMetadata
 
+from app.clients import plain
 from app.scripts.contract import ScriptResult, validate_filter
 from app.scripts.errors import ScriptContractError, ScriptExecutionError
 
@@ -36,18 +37,6 @@ METADATA_FILTER_TYPES = frozenset(
     {"metadataFieldText", "metadataFieldSelection", "metadataFieldDate", "hasMetadataField"}
 )
 FIELD_REF_KEYS = ("metadataFieldID", "customMetadataFieldID", "standardMetadataFieldID")
-
-
-def plain(value: object) -> Any:
-    """Wandelt Client-Antworten in einfache Python-Werte."""
-    to_dict = getattr(value, "to_dict", None)
-    if callable(to_dict):
-        return plain(to_dict())
-    if isinstance(value, dict):
-        return {key: plain(item) for key, item in value.items()}
-    if isinstance(value, list | tuple):
-        return [plain(item) for item in value]
-    return value
 
 
 def single(response: object, key: str) -> dict[str, Any]:

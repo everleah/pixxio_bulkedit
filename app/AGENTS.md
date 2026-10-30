@@ -31,7 +31,8 @@
   verschluesselt den Key nur dort und liefert `current_user_name` fuer Verbindungstests.
 - `ui/`: `guard.py` (Session- und Rollenpruefung), `shell.py` (Palette und Kopfzeile),
   `admin.py` (Seiten `/admin/profiles` und `/admin/users`), `scripts.py` (Liste und Editor
-  unter `/scripts`); Details in `ui/AGENTS.md`.
+  unter `/scripts`), `workspaces.py` (Liste `/workspaces`, Grid `/workspaces/{id}`,
+  Datenendpunkte `/workspace/rows` und `/workspace/changes`); Details in `ui/AGENTS.md`.
 - `scripts/`: Abfrage-Scripts mit Vertrag, RestrictedPython, read-only Fassade `px`,
   Kindprozess-Ausfuehrung, Versionierung und Vorlagen; Details in `scripts/AGENTS.md`.
 - `cli.py` mit `__main__.py`: `init-db`, `generate-master-key`, `create-superuser`,

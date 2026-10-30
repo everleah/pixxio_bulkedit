@@ -29,12 +29,14 @@ from app.db import (
     session_scope,
 )
 from app.models import AppUser, Role
+from app.schema import SchemaCache
 from app.scripts.runner import ScriptRunner
 from app.settings import get_settings
 from app.ui.admin import register_admin_pages
 from app.ui.guard import current_user, logout
 from app.ui.scripts import register_script_pages
 from app.ui.shell import apply_palette
+from app.ui.workspaces import register_workspace_pages
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +84,9 @@ def _home_view(user: AppUser, timeout: timedelta) -> None:
         ui.label(f"Angemeldet als {user.username} ({user.role.value})")
         if user.role is Role.SUPERUSER:
             with ui.row().classes("gap-2"):
+                ui.button("Arbeitsbestaende", on_click=lambda: ui.navigate.to("/workspaces")).props(
+                    "outline dense"
+                )
                 ui.button("Scripts", on_click=lambda: ui.navigate.to("/scripts")).props(
                     "outline dense"
                 )
@@ -91,11 +96,15 @@ def _home_view(user: AppUser, timeout: timedelta) -> None:
                 ui.button("Benutzer", on_click=lambda: ui.navigate.to("/admin/users")).props(
                     "outline dense"
                 )
-        elif user.can_edit_scripts:
-            ui.button("Scripts", on_click=lambda: ui.navigate.to("/scripts")).props("outline dense")
-        ui.label("Profilwahl, Grid und Review folgen in den naechsten Meilensteinen.").classes(
-            "text-sm"
-        )
+        else:
+            ui.button("Arbeitsbestaende", on_click=lambda: ui.navigate.to("/workspaces")).props(
+                "outline dense"
+            )
+            if user.can_edit_scripts:
+                ui.button("Scripts", on_click=lambda: ui.navigate.to("/scripts")).props(
+                    "outline dense"
+                )
+        ui.label("Review und Schreiben folgen in den naechsten Meilensteinen.").classes("text-sm")
         ui.label(f"Sitzung laeuft nach {timeout.total_seconds() // 60:.0f} Minuten ab.").classes(
             "text-xs"
         )
@@ -110,6 +119,7 @@ def main() -> None:
     session_factory = create_session_factory(engine)
     secret_box = SecretBox.from_master_key(settings.master_key)
     client_factory = ClientFactory(secret_box)
+    schema_cache = SchemaCache(secret_box)
     runner = ScriptRunner(
         timeout_seconds=settings.script_timeout_seconds,
         max_output_chars=settings.script_max_output_chars,
@@ -128,6 +138,7 @@ def main() -> None:
 
     register_admin_pages(session_factory, secret_box, client_factory)
     register_script_pages(session_factory, secret_box, runner)
+    register_workspace_pages(session_factory, secret_box, schema_cache, client_factory, runner)
 
     ui.run(
         title=APP_TITLE,

@@ -30,6 +30,18 @@ def response_mapping(value: object) -> dict[str, Any]:
     return {}
 
 
+def plain(value: object) -> Any:
+    """Wandelt Client-Antworten vollstaendig in einfache Python-Werte."""
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return plain(to_dict())
+    if isinstance(value, dict):
+        return {key: plain(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [plain(item) for item in value]
+    return value
+
+
 def current_user_name(client: Client) -> str | None:
     """Liest den Anzeigenamen des API-Benutzers fuer den Verbindungstest."""
     response = response_mapping(User(client).get_current())

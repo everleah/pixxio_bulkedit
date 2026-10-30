@@ -24,6 +24,15 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def as_utc(value: datetime) -> datetime:
+    """Zeitstempel als UTC interpretieren.
+
+    SQLite speichert keine Zeitzone; gelesene Werte sind naiv und werden hier als
+    UTC ergaenzt, damit sie mit :func:`utc_now` vergleichbar bleiben.
+    """
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
 def str_enum(enum_cls: type[PyEnum], name: str, *, length: int = 32) -> SAEnum:
     """Enum-Spalte, die die ``value``-Strings speichert und per CHECK absichert."""
     return SAEnum(
