@@ -13,6 +13,7 @@ from dataclasses import dataclass
 class Palette:
     primary: str = "#16a34a"
     success: str = "#22c55e"
+    surface_success: str = "#dcfce7"
     info: str = "#0ea5e9"
     info_dark: str = "#0891b2"
     warning: str = "#d97706"

@@ -152,12 +152,17 @@ Wachstum. `--db-path` behaelt die Datei, `--keep` die temporaere. Die Messwerte 
 
 Startet einen Prototyp unter `http://127.0.0.1:8200/bench`: AG Grid Community mit
 Infinite Row Model, Blockabruf ueber `/bench/rows`, serverseitiger Filter und
-serverseitige Sortierung auf dem effektiven Stand. Die Schaltflaechen
-**An Inhalt anpassen** und **An Anzeige anpassen** setzen die Spaltenbreiten auf den
-Zellinhalt beziehungsweise auf die sichtbare Breite; wird eine Spalte dabei schmaler als
-80 px, meldet die Oberflaeche das sichtbar. Farben und Kopfzeilenverlauf stammen aus
-`app/colors.py`. Der erste Start legt die Datenbank unter `%TEMP%` an; weitere Starts
-verwenden sie wieder. Die Route ist nur Teil des Lastnachweises, nicht der Anwendung.
+serverseitige Sortierung auf dem effektiven Stand. Das Grid fuellt die verfuegbare
+Hoehe; Kopfzeile und Steuerelemente liegen darueber. Die Aktionen sind Icon-Buttons mit
+Tooltip und `aria-label` (Filter, Sortierung, **An Inhalt anpassen**, **An Anzeige
+anpassen**), damit weitere Funktionen die Zeile nicht sprengen. Die Sortierrichtung ist
+ein Umschalter aus zwei Pfeil-Icons; die aktive Richtung ist hervorgehoben und wird
+zusaetzlich im Statustext genannt. Die beiden
+Spaltenbreiten-Aktionen setzen die Breiten auf den Zellinhalt beziehungsweise auf die
+sichtbare Breite; wird eine Spalte dabei schmaler als 80 px, meldet die Oberflaeche das
+sichtbar. Farben und Kopfzeilenverlauf stammen aus `app/colors.py`. Der erste Start legt
+die Datenbank unter `%TEMP%` an; weitere Starts verwenden sie wieder. Die Route ist nur
+Teil des Lastnachweises, nicht der Anwendung.
 
 ## Code-Quality-Gates
 

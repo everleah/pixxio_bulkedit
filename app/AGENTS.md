@@ -43,6 +43,8 @@
   entstehen getrennt davon.
 - UI-Farben ausschliesslich aus `app/colors.py` beziehen, auch fuer AG Grid
   (`--ag-*`-Variablen auf dem Grid-Container).
+- Aktionen in Werkzeugleisten als Icon-Button mit Tooltip und `aria-label` umsetzen,
+  nicht als Textbutton; Text bleibt der Tooltip.
 - API-Keys liegen ausschliesslich verschluesselt in `profile.api_key_enc` und nie in
   Logs, Fehlermeldungen, Sessions oder im Browser.
 - Berechtigungen werden serverseitig je Aktion geprueft; UI-Ausblendungen ersetzen das nicht.

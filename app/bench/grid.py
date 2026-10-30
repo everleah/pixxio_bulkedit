@@ -11,7 +11,7 @@ import argparse
 import json
 import tempfile
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -156,14 +156,25 @@ DATASOURCE_JS = """
 
 HEAD_HTML = f"""
 <style>
+  body .q-page {{
+    padding: 0;
+  }}
+  body .nicegui-content {{
+    height: 100vh;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    gap: 0.5rem;
+  }}
   body .bench-grid {{
+    flex: 1 1 0;
+    min-height: 0;
     --ag-foreground-color: {PALETTE.text};
     --ag-background-color: #ffffff;
     --ag-header-background-color: {PALETTE.page_background};
     --ag-header-foreground-color: {PALETTE.text};
     --ag-odd-row-background-color: #f8fafc;
     --ag-row-hover-color: #e6f6ec;
-    --ag-selected-row-background-color: #dcfce7;
+    --ag-selected-row-background-color: {PALETTE.surface_success};
     --ag-border-color: #cbd5e1;
     --ag-checkbox-checked-color: {PALETTE.primary};
     --ag-input-focus-border-color: {PALETTE.primary};
@@ -183,6 +194,11 @@ MIN_COLUMN_WIDTH = 80
 
 
 def create_page(keys: Sequence[str], assets: int) -> None:
+    def action_button(icon: str, label: str, handler: Callable[[], Any]) -> None:
+        button = ui.button(on_click=handler, icon=icon).props("flat round dense color=primary")
+        button.tooltip(label)
+        button.props(f'aria-label="{label}"')
+
     column_defs: list[dict[str, Any]] = [
         {"field": "fileId", "headerName": "ID", "width": 110},
         {"field": "fileName", "headerName": "Datei", "width": 190},
@@ -207,16 +223,39 @@ def create_page(keys: Sequence[str], assets: int) -> None:
             ui.label(f"Grid-Prototyp: {assets:,} Assets, {len(keys)} Metadaten-Spalten").classes(
                 "text-lg font-semibold"
             )
+            status = ui.label("").classes("ml-auto text-sm")
 
-        with ui.row().classes("items-end gap-2"):
-            filter_input = ui.input("Filter (enthaelt)").props("outlined dense").classes("w-64")
+        with ui.row().classes("w-full flex-wrap items-end gap-2") as controls:
+            filter_input = ui.input("Filter (enthaelt)").props("outlined dense").classes("w-56")
             sort_select = (
                 ui.select(["", *keys], value="", label="Sortierspalte")
                 .props("outlined dense")
-                .classes("w-48")
+                .classes("w-44")
             )
-            direction = ui.toggle({"asc": "aufsteigend", "desc": "absteigend"}, value="asc")
-            status = ui.label("").style(f"color: {PALETTE.text}").classes("text-sm")
+            direction: dict[str, str] = {"value": "asc"}
+            with ui.button_group().props("flat"):
+                ascending_button = ui.button(icon="arrow_upward").props("flat round dense")
+                descending_button = ui.button(icon="arrow_downward").props("flat round dense")
+            for button, label in (
+                (ascending_button, "Aufsteigend sortieren"),
+                (descending_button, "Absteigend sortieren"),
+            ):
+                button.tooltip(label)
+                button.props(f'aria-label="{label}"')
+
+        def set_direction(value: str) -> None:
+            direction["value"] = value
+            refresh_direction()
+
+        def refresh_direction() -> None:
+            for button, value in ((ascending_button, "asc"), (descending_button, "desc")):
+                active = direction["value"] == value
+                background = PALETTE.surface_success if active else "transparent"
+                button.style(f"opacity: {1 if active else 0.45}; background: {background}")
+
+        ascending_button.on("click", lambda: set_direction("asc"))
+        descending_button.on("click", lambda: set_direction("desc"))
+        refresh_direction()
 
         grid = ui.aggrid(
             {
@@ -230,7 +269,7 @@ def create_page(keys: Sequence[str], assets: int) -> None:
                 ":datasource": DATASOURCE_JS,
             },
             auto_size_columns=False,
-        ).classes("bench-grid w-full h-[32rem]")
+        ).classes("bench-grid w-full")
 
         async def apply_filter() -> None:
             await ui.run_javascript(
@@ -241,11 +280,11 @@ def create_page(keys: Sequence[str], assets: int) -> None:
 
         async def apply_sort() -> None:
             field = sort_select.value or ""
-            state = [] if not field else [{"colId": field, "sort": direction.value}]
+            state = [] if not field else [{"colId": field, "sort": direction["value"]}]
             await grid.run_grid_method(
                 "applyColumnState", {"state": state, "defaultState": {"sort": None}}
             )
-            status.set_text(f"Sortierung: {field or 'keine'} {direction.value}")
+            status.set_text(f"Sortierung: {field or 'keine'} {direction['value']}")
 
         async def fit_content() -> None:
             await grid.run_grid_method("autoSizeAllColumns", False)
@@ -266,11 +305,11 @@ def create_page(keys: Sequence[str], assets: int) -> None:
             else:
                 status.set_text("Spalten an Anzeige angepasst")
 
-        with ui.row().classes("gap-2"):
-            ui.button("Filter anwenden", on_click=apply_filter).props("dense")
-            ui.button("Sortierung anwenden", on_click=apply_sort).props("dense")
-            ui.button("An Inhalt anpassen", on_click=fit_content).props("dense outline")
-            ui.button("An Anzeige anpassen", on_click=fit_display).props("dense outline")
+        with controls:
+            action_button("filter_alt", "Filter anwenden", apply_filter)
+            action_button("sort", "Sortierung anwenden", apply_sort)
+            action_button("compress", "An Inhalt anpassen", fit_content)
+            action_button("fit_screen", "An Anzeige anpassen", fit_display)
 
 
 def build_parser() -> argparse.ArgumentParser:
