@@ -330,6 +330,33 @@ und eine `.env` (Vorlage: `.env.vps.example`) in einem Ordner:
 - Herunterfahren: `stop_grace_period` 30 s; laufende Schreibvorgänge werden nicht neu
   gesendet — nach dem Start in `/runs` „Status abgleichen“ ausführen.
 
+### Erster Superuser (Pflicht, kein Standardpasswort)
+
+Die Anwendung bringt bewusst keinen vorgefertigten Benutzer mit: Ohne angelegten
+Superuser kann sich niemand anmelden. Nach dem ersten `./deploy-vps.sh` einmalig im
+Container anlegen (Passwort mindestens 12 Zeichen):
+
+```bash
+docker exec -it pixxio-bulkedit-vps python -m app create-superuser --username admin
+# fragt "Passwort:" und "Passwort wiederholen:" ab
+```
+
+Ohne TTY (z. B. aus einem Skript) das Passwort über stdin übergeben, damit es nicht in
+der Shell-Historie oder in `docker inspect` landet:
+
+```bash
+read -rsp "Passwort: " PW; echo
+printf '%s\n' "$PW" | docker exec -i pixxio-bulkedit-vps python -m app create-superuser \
+    --username admin --password-stdin
+unset PW
+```
+
+Ein erneuter Aufruf mit demselben Namen setzt das Passwort zurück und stellt die
+Superuser-Rolle wieder her. Prozess umgebungsvariablen wie `BULKEDIT_MASTER_KEY` gelten
+im Container automatisch, weil `docker exec` die Compose-Umgebung des Containers nutzt —
+die Datenbank liegt dabei unter `/data/bulkedit.sqlite3`. Weitere Benutzer legt der
+Superuser danach in der Oberfläche unter „Benutzer“ an.
+
 ## Sicherung und Wiederherstellung
 
 Es gibt keinen automatischen Backup-Dienst. Gesichert wird manuell und verschlüsselt:

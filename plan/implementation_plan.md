@@ -583,7 +583,11 @@ Deployment: `Dockerfile` (python:3.14-slim, Migrationen im Image, `HEALTHCHECK` 
 `bulkedit.vcs1.him-tools.de`, Volume `/data`, Loggrenzen, `stop_grace_period`),
 `.env.vps.example`, `push-to-forgejo.ps1` und `deploy-vps.sh` (Healthcheck-Abfrage,
 optionales Backup vor Updates). Die Anwendung liefert `GET /health` (Datenbankpruefung,
-Version) und beendet sich mit einem Shutdown-Protokolleintrag. Lokal geprueft: Image
+Version) und beendet sich mit einem Shutdown-Protokolleintrag. Einen ersten Superuser
+gibt es bewusst nicht automatisch: Er wird nach dem Deployment einmalig mit
+`docker exec -it pixxio-bulkedit-vps python -m app create-superuser --username admin`
+angelegt (Passwort ab 12 Zeichen, kein Default in `.env` oder Compose). Lokal geprueft:
+Image
 gebaut, Container startet migrationsfrei von 0 auf `0002`, Healthcheck `healthy`,
 `/health` = `{"status":"ok","version":"0.1.0"}`, Compose-Konfiguration rendert die
 Traefik-Regeln. Nicht lokal pruefbar: Push in die Forgejo-Registry und Deployment auf dem
