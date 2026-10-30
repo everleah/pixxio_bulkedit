@@ -31,6 +31,14 @@
   einen nachgebauten Client.
 - `test_i18n.py`: Vollstaendigkeit des englischen Katalogs (jeder `t(...)`-Text muss
   uebersetzt sein), Platzhalterformatierung, Sprachumschaltung und Rueckfall auf Deutsch.
+- `test_writeplan.py`: Schreibplan aus dem ChangeSet (filesPut-Felder, Abschneiden leerer
+  Werte, Keyword-Diff, Options-IDs, Datumsformat, Gruppierung je `CHUNK_SIZE`), Ablehnung
+  unbekannter/nicht schreibbarer Spalten und ungueltiger Auswahlen, Digest-Gleichheit,
+  Persistenz sowie Konflikterkennung ueber `modifyDate`.
+- `test_writer.py`: Schreiblauf mit nachgebautem Client (`File`/`Job` ersetzt): Dry Run
+  ohne Schreiben, Live-Lauf mit Rueckleseverifikation, Buchung in `ChangeLog`/`Run`,
+  Sperren bei veraltetem Entwurf und Konflikten, Fehlschlag/unklarer Ausgang/Teilfehler,
+  Pause bei systematischen Fehlern, Ueberschneidungswarnung und `reconcile`.
 
 ## Local Contracts
 
@@ -41,6 +49,8 @@
 - Tests schreiben ausschliesslich in temporaere SQLite-Dateien aus `tmp_path`.
 - Import-Smoke-Tests sind kein Nachweis fuer API-Verhalten oder Lastziele.
 - Schemaaenderungen muessen `test_migrationen_passen_zu_modellen` bestehen.
+- Schreibpfad-Tests ersetzen `pixxio_client.files.File` und `pixxio_client.jobs.Job`
+  ueber `monkeypatch.setattr`; echte Schreibaufrufe gehoeren nicht in die Testsuite.
 
 ## Work Guidance
 

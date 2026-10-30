@@ -26,6 +26,9 @@
   veroeffentlichten Script, Liste offener Entwuerfe) und `/workspaces/{id}` (AG Grid mit
   Infinite Row Model). Daten liefern `GET /workspace/rows` (effektiver Stand, Filter,
   Sortierung, `onlyChanged`) und `GET /workspace/changes` (geaenderte Zellen je Asset).
+- `review.py`: `register_review_pages` registriert `/workspaces/{id}/review`: Liste aller
+  Feldänderungen, Fehler/Hinweise (inklusive externer Aenderungen), `Dry Run prüfen`,
+  `Jetzt schreiben` und Rueckweg ins Grid.
 
 ## Local Contracts
 
@@ -57,6 +60,15 @@
   fuer noch nicht geladene Zeilen auswertet.
 - Nach jeder Aenderung: `/workspace/changes` neu laden, `purgeInfiniteCache` ausfuehren und
   den Statustext (Zeilen, Aenderungen, Revision) neu setzen.
+- Die Review-Seite arbeitet ausschliesslich ueber `app/writer.py` und `app/writeplan.py`;
+  sie baut das Preview bei jedem Schritt neu (Digest-Pruefung) und zeigt Fehler, Hinweise
+  und Konflikte an. Geschrieben wird nur ueber `client_factory.writer_client_for`.
+- Blockierende Arbeit (Preview, Dry Run, Schreiben) laeuft in `run.io_bound` und oeffnet
+  dort eine eigene Session; danach aktualisiert die Seite die Anzeige mit dem neuen Preview.
+- Nach erfolgreichem Schreiben zeigt die Seite das frische Preview (0 Aenderungen) und
+  meldet, wie viele Aenderungen aus dem Entwurf entfernt wurden.
+- Die Ueberschreibbestaetigung ist eine Checkbox und wird nur wirksam, wenn Konflikte
+  gemeldet sind; ohne Bestaetigung blockiert `execution_blockers` den Live-Lauf.
 
 ## Work Guidance
 
@@ -78,6 +90,9 @@
 - `/workspaces`: bestehenden Arbeitsbestand oeffnen, eine Zelle bearbeiten (Status zeigt
   eine Aenderung und eine hoehere Revision), "nur geaenderte Zeilen" sowie Wertfilter
   pruefen, Bulk-Wert setzen und Aenderungen verwerfen.
+- `/workspaces/{id}/review`: Dry Run ausfuehren (Protokolleintrag mit Status `ok`), dann
+  "Jetzt schreiben"; nach Erfolg steht die Aenderungszahl auf 0 und die Werte sind im Grid
+  sichtbar. Mit einer extern geaenderten Datei muss der Lauf ohne Bestaetigung blockieren.
 
 ## Child DOX Index
 

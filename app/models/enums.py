@@ -44,11 +44,12 @@ class RunStatus(StrEnum):
 
 
 class ChangeStatus(StrEnum):
-    """Ergebnis einer geplanten Felduebernahme."""
+    """Ergebnis einer geplanten Feldübernahme."""
 
     PLANNED = "planned"
     OK = "ok"
     FAILED = "failed"
+    SKIPPED = "skipped"
     SKIPPED_CONFLICT = "skipped_conflict"
     UNKNOWN = "unknown"
 
@@ -67,6 +68,7 @@ class StepStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     OK = "ok"
+    PARTIAL = "partial"
     FAILED = "failed"
     UNKNOWN = "unknown"
     SKIPPED = "skipped"

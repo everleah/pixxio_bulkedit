@@ -60,6 +60,7 @@ class ClientFactory:
         self._secret_box = secret_box
         self._builder = builder
         self._clients: dict[int, Client] = {}
+        self._writers: dict[int, Client] = {}
         self._lock = threading.RLock()
 
     def client_for(self, profile: Profile) -> Client:
@@ -68,19 +69,39 @@ class ClientFactory:
         with self._lock:
             client = self._clients.get(profile.id)
             if client is None:
-                api_key = self._secret_box.decrypt(profile.api_key_enc)
-                client = self._builder(api_key, profile.host, profile.max_retries)
+                client = self._build(profile, profile.max_retries)
                 self._clients[profile.id] = client
             return client
+
+    def writer_client_for(self, profile: Profile) -> Client:
+        """Client ohne automatische Wiederholungen fuer Schreibzugriffe.
+
+        Der Writer sendet nichts blind erneut: unklare Ergebnisse werden
+        zurueckgelesen und als unklar ausgewiesen.
+        """
+        if profile.id is None:
+            raise ValueError("Profil ohne ID kann keinen Client liefern.")
+        with self._lock:
+            client = self._writers.get(profile.id)
+            if client is None:
+                client = self._build(profile, 0)
+                self._writers[profile.id] = client
+            return client
+
+    def _build(self, profile: Profile, max_retries: int) -> Client:
+        api_key = self._secret_box.decrypt(profile.api_key_enc)
+        return self._builder(api_key, profile.host, max_retries)
 
     def invalidate(self, profile_id: int) -> None:
         with self._lock:
             self._clients.pop(profile_id, None)
+            self._writers.pop(profile_id, None)
 
     def clear(self) -> None:
         with self._lock:
             self._clients.clear()
+            self._writers.clear()
 
     def cached_profile_ids(self) -> list[int]:
         with self._lock:
-            return sorted(self._clients)
+            return sorted(set(self._clients) | set(self._writers))

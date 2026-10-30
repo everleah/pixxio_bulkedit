@@ -257,8 +257,7 @@ def _append_row(
         raise WorkspaceError(
             f"Die Ergebnismenge ueberschreitet das Profillimit von {max_rows} Zeilen."
         )
-    metadata = payload.get("metadataFields") or {}
-    values = {column.key: _read_value(payload, column, metadata) for column in columns}
+    values = file_values(payload, columns)
     rows.append(
         AssetRow(
             file_id=file_id,
@@ -281,11 +280,29 @@ def _read_value(payload: dict[str, Any], column: ColumnDef, metadata: dict[str, 
     return _canonical_safe(column, entry.get("value"))
 
 
+def file_values(payload: dict[str, Any], columns: Sequence[ColumnDef]) -> dict[str, Any]:
+    """Liest die Spaltenwerte eines Datei-Payloads in Anzeigenormalform."""
+    metadata = payload.get("metadataFields") or {}
+    return {column.key: _read_value(payload, column, metadata) for column in columns}
+
+
 def _canonical_safe(column: ColumnDef, value: Any) -> Any:
     try:
-        return canonical(column.edit_type, value, options=column.options)
+        return canonical(column.edit_type, _option_names(column, value), options=column.options)
     except ScriptContractError:
         return None if is_empty(value) else value
+
+
+def _option_names(column: ColumnDef, value: Any) -> Any:
+    """Auswahl-IDs in Optionsnamen übersetzen (API liefert beides)."""
+    mapping = {option_id: name for option_id, name in column.option_ids}
+    if not mapping or is_empty(value):
+        return value
+    if isinstance(value, list):
+        return [_option_names(column, item) for item in value]
+    if isinstance(value, int) and not isinstance(value, bool):
+        return mapping.get(value, value)
+    return value
 
 
 def _text(value: Any) -> str | None:
@@ -383,6 +400,47 @@ def clear_changes(
     result = session.execute(statement)
     _bump(workspace, session)
     return int(getattr(result, "rowcount", 0) or 0)
+
+
+def commit_applied(
+    session: Session,
+    workspace: Workspace,
+    applied: Sequence[tuple[int, str]],
+    *,
+    values: dict[int, dict[str, Any]] | None = None,
+    modify_dates: dict[int, str] | None = None,
+) -> int:
+    """Uebernimmt geschriebene Felder in den Snapshot und leert ihre Aenderung."""
+    if not applied:
+        return 0
+    removed = 0
+    touched: set[int] = set()
+    for file_id, key in applied:
+        result = session.execute(
+            delete(WorkspaceChange).where(
+                WorkspaceChange.workspace_id == workspace.id,
+                WorkspaceChange.file_id == file_id,
+                WorkspaceChange.field_key == key,
+            )
+        )
+        removed += int(getattr(result, "rowcount", 0) or 0)
+        asset = session.get(WorkspaceAsset, (workspace.id, file_id))
+        if asset is None:
+            continue
+        stored = json.loads(asset.values_json)
+        read_back = (values or {}).get(file_id, {})
+        if key in read_back:
+            stored[key] = read_back[key]
+        asset.values_json = json.dumps(stored, ensure_ascii=False)
+        touched.add(file_id)
+    for file_id in touched:
+        modify_date = (modify_dates or {}).get(file_id)
+        if modify_date:
+            asset = session.get(WorkspaceAsset, (workspace.id, file_id))
+            if asset is not None:
+                asset.modify_date = modify_date
+    _bump(workspace, session)
+    return removed
 
 
 def _as_text(value: Any) -> str | None:
@@ -616,11 +674,13 @@ __all__ = [
     "changed_file_ids",
     "clear_changes",
     "close_workspace",
+    "commit_applied",
     "create_workspace",
     "delete_workspace",
     "effective_page",
     "expiry_for",
     "expiry_warning_days",
+    "file_values",
     "json_path",
     "list_workspaces",
     "load_assets",

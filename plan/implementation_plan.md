@@ -397,6 +397,26 @@ mit seinen Aenderungen wieder geoeffnet werden.
 
 Aendert sich der Entwurf, verliert sein bisheriger Review die Gueltigkeit.
 
+**Umgesetzt (30.10.2026):** `app/writeplan.py` bildet aus dem ChangeSet die Payloads
+(`filesPut`-Felder, Keyword-Diff, Metadaten ueber `MetadataValueBuilder`), gruppiert
+identische Payloads zu Schritten (200 IDs je Block) und speichert den Plan mit Digest,
+Schritten und Payload-Hash. `app/writer.py` prueft den Entwurf gegen die API
+(`review`: Existenz, `modifyDate`-Konflikte, laufende Schreibauftraege desselben Hosts),
+fuehrt den Dry Run aus, schreibt live mit einem Client ohne PUT-Wiederholungen
+(`ClientFactory.writer_client_for`), speichert die Job-ID vor dem Warten, liest jedes
+Ergebnis zurueck und bucht es in `run`/`change_log`. Nach vollstaendigem Erfolg uebernimmt
+`commit_applied` die Werte in den Snapshot und leert den ChangeSet. Die Seite
+`/workspaces/{id}/review` zeigt Fehler, Hinweise und Aenderungen, verlangt bei Konflikten
+eine Bestaetigung und startet Dry Run beziehungsweise Schreiben. Migration `0002` erweitert
+`ChangeStatus` um `skipped` und `StepStatus` um `partial`. Live geprueft: drei eigene
+Test-Assets, Bulk-Wert im Grid, Review und Dry Run (Lauf 6), Schreiben (Lauf 7, Job
+30293895, Ruecklesung 3/3), externer Konflikt blockiert den Lauf ohne Bestaetigung, mit
+Bestaetigung erfolgreich (Lauf 8), danach 0 Aenderungen im Entwurf.
+
+Offene Punkte: `fileStateChangeComment` (Pflichtkommentar bei Statuswechsel) ist noch nicht
+geprueft; `reconcile` fuer unterbrochene Auftraege ist implementiert, aber nur offline
+getestet.
+
 ### Schreibplan und Client-Nutzung
 
 - Nur geaenderte Felder aufnehmen.

@@ -35,6 +35,7 @@ from app.scripts.runner import ScriptRunner
 from app.settings import get_settings
 from app.ui.admin import register_admin_pages
 from app.ui.guard import current_user, logout
+from app.ui.review import register_review_pages
 from app.ui.scripts import register_script_pages
 from app.ui.shell import apply_locale, apply_palette
 from app.ui.widgets import action_button
@@ -91,7 +92,9 @@ def _home_view(user: AppUser, timeout: timedelta) -> None:
             if user.role is Role.SUPERUSER:
                 action_button("badge", t("Profile"), lambda: ui.navigate.to("/admin/profiles"))
                 action_button("group", t("Benutzer"), lambda: ui.navigate.to("/admin/users"))
-        ui.label(t("Review und Schreiben folgen in den nächsten Meilensteinen.")).classes("text-sm")
+        ui.label(
+            t("Änderungen prüfen und schreiben: Arbeitsbestand öffnen, Review und Dry Run.")
+        ).classes("text-sm")
         ui.label(
             t(
                 "Sitzung läuft nach {minutes} Minuten ab.",
@@ -130,6 +133,7 @@ def main() -> None:
     register_admin_pages(session_factory, secret_box, client_factory)
     register_script_pages(session_factory, secret_box, runner)
     register_workspace_pages(session_factory, secret_box, schema_cache, client_factory, runner)
+    register_review_pages(session_factory, schema_cache, client_factory)
 
     ui.run(
         title=APP_TITLE,

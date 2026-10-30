@@ -35,6 +35,12 @@ EN_TRANSLATIONS: dict[str, str] = {
     "Review und Schreiben folgen in den nächsten Meilensteinen.": (
         "Review and writing follow in the next milestones."
     ),
+    "Änderungen prüfen und schreiben: Arbeitsbestand öffnen, Review und Dry Run.": (
+        "Check and write changes: open a workspace, then review and dry run."
+    ),
+    "Dry Run {run}: geprüft ({steps} Anfrage(n), {conflicts} Konflikt(e)).": (
+        "Dry run {run}: checked ({steps} request(s), {conflicts} conflict(s))."
+    ),
     "Zu viele Fehlversuche. Bitte später erneut versuchen.": (
         "Too many failed attempts. Please try again later."
     ),
@@ -208,6 +214,70 @@ EN_TRANSLATIONS: dict[str, str] = {
     "{count} Änderungen": "{count} changes",
     "expiry": "expiry",
     "laeuft": "runs",
+    # Review und Schreibpipeline
+    "Review und schreiben": "Review and write",
+    "Review aktualisieren": "Refresh review",
+    "Review aktualisiert.": "Review refreshed.",
+    "Dry Run prüfen": "Check dry run",
+    "Jetzt schreiben": "Write now",
+    "Zum Grid": "Back to grid",
+    "Nur geänderte Felder werden geschrieben; jedes Ergebnis wird zurückgelesen.": (
+        "Only changed fields are written; every result is read back."
+    ),
+    "Externe Änderungen überschreiben": "Overwrite external changes",
+    "Feldänderungen: {changes} | Dateien: {files} | Anfragen: {steps}": (
+        "Field changes: {changes} | files: {files} | requests: {steps}"
+    ),
+    "Hinweis: {message}": "Note: {message}",
+    "Der Plan enthält Fehler und ist nicht ausführbar.": (
+        "The plan contains errors and cannot be executed."
+    ),
+    "Der Plan enthält Fehler und kann nicht gespeichert werden.": (
+        "The plan contains errors and cannot be saved."
+    ),
+    "Der Entwurf hat sich geändert. Bitte Review und Dry Run erneuern.": (
+        "The draft has changed. Please refresh review and dry run."
+    ),
+    "Dieser Auftrag wurde bereits ausgeführt.": "This job has already been executed.",
+    "Externe Änderungen erkannt. Bitte das Überschreiben ausdrücklich bestätigen.": (
+        "External changes detected. Please confirm overwriting explicitly."
+    ),
+    "Externe Änderungen erkannt: {files}": "External changes detected: {files}",
+    "Ein weiterer Schreibauftrag läuft auf diesem Host bereits (Läufe: {runs}).": (
+        "Another write job is already running on this host (runs: {runs})."
+    ),
+    "Datei {file_id} ist nicht mehr vorhanden.": "File {file_id} no longer exists.",
+    "Der Arbeitsbestand zum Plan fehlt.": "The workspace for this plan is missing.",
+    "Die API hat den Schreibvorgang abgelehnt.": "The API rejected the write request.",
+    "Der Hintergrundauftrag ist fehlgeschlagen.": "The background job failed.",
+    "Ausgang unklar: {message}": "Outcome unclear: {message}",
+    "Ausgang nach Neustart unklar. Bitte Werte prüfen.": (
+        "Outcome unclear after restart. Please check the values."
+    ),
+    "Über Rücklesung bestätigt: {message}": "Confirmed by reading back: {message}",
+    "Rücklesung weicht bei {count} Feld(ern) ab.": ("Read-back differs for {count} field(s)."),
+    "Schreiblauf {run}: {status} ({ok} erfolgreich, {unknown} unklar, {failed} fehlgeschlagen, "
+    "{skipped} übersprungen).": (
+        "Write run {run}: {status} ({ok} succeeded, {unknown} unclear, {failed} failed, "
+        "{skipped} skipped)."
+    ),
+    "Aus dem Entwurf entfernte Änderungen: {count}": ("Changes removed from the draft: {count}"),
+    "Es gibt keine Änderungen.": "There are no changes.",
+    "Unbekannte Spalte: {key}": "Unknown column: {key}",
+    "Die Spalte {key} gehört nicht zum Arbeitsbestand.": (
+        "Column {key} is not part of the workspace."
+    ),
+    "Die Spalte {label!r} ist nicht schreibbar.": "Column {label!r} is not writable.",
+    "Die Änderungen ergeben keinen Schreibvorgang.": "The changes produce no write request.",
+    "Das Attribut {attribute!r} ist nicht schreibbar.": "Attribute {attribute!r} is not writable.",
+    "Der Wert für {label!r} konnte nicht umgewandelt werden.": (
+        "The value for {label!r} could not be converted."
+    ),
+    "Unbekannte Auswahl für {label}: {values}": "Unknown option for {label}: {values}",
+    "{label}: widersprüchliche Werte im selben Schreibvorgang.": (
+        "{label}: conflicting values in the same write request."
+    ),
+    "{label}: {message}": "{label}: {message}",
 }
 
 

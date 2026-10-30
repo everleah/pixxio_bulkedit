@@ -197,7 +197,7 @@ def _api_user(session_factory: SessionFactory) -> AppUser | None:
         return user
 
 
-def _owned_workspace(session: Any, workspace_id: int, user: AppUser) -> Workspace | None:
+def owned_workspace(session: Any, workspace_id: int, user: AppUser) -> Workspace | None:
     workspace = session.get(Workspace, workspace_id)
     if workspace is None:
         return None
@@ -256,7 +256,7 @@ def column_def(column: ColumnDef) -> dict[str, Any]:
     return definition
 
 
-def _script_columns(session: Any, workspace: Workspace) -> list[str] | None:
+def script_column_keys(session: Any, workspace: Workspace) -> list[str] | None:
     if workspace.script_version_id is None:
         return None
     version = session.get(QueryScriptVersion, workspace.script_version_id)
@@ -302,14 +302,14 @@ def register_workspace_pages(
         except ValueError:
             return JSONResponse({"error": "ungueltige Anfrage"}, status_code=400)
         with session_scope(session_factory) as session:
-            workspace = _owned_workspace(session, workspace_id, user)
+            workspace = owned_workspace(session, workspace_id, user)
             if workspace is None:
                 return JSONResponse({"error": "nicht gefunden"}, status_code=404)
             profile = session.get(Profile, workspace.profile_id)
             if profile is None:
                 return JSONResponse({"error": "Profil fehlt"}, status_code=409)
             schema = schema_cache.get(profile)
-            columns = workspace_columns(schema, _script_columns(session, workspace))
+            columns = workspace_columns(schema, script_column_keys(session, workspace))
             if not columns:
                 return JSONResponse({"error": "keine Spalten"}, status_code=409)
             sort_column = _column_for(columns, params.get("sortKey")) or columns[0]
@@ -337,7 +337,7 @@ def register_workspace_pages(
         except ValueError:
             return JSONResponse({"error": "ungueltige Anfrage"}, status_code=400)
         with session_scope(session_factory) as session:
-            workspace = _owned_workspace(session, workspace_id, user)
+            workspace = owned_workspace(session, workspace_id, user)
             if workspace is None:
                 return JSONResponse({"error": "nicht gefunden"}, status_code=404)
             cells: dict[str, list[str]] = {}
@@ -571,7 +571,7 @@ def register_workspace_pages(
             redirect_to_login()
             return
         with session_scope(session_factory) as session:
-            workspace = _owned_workspace(session, workspace_id, user)
+            workspace = owned_workspace(session, workspace_id, user)
             if workspace is None:
                 page_header(t("Arbeitsbestände"), user)
                 ui.label(t("Der Arbeitsbestand wurde nicht gefunden.")).classes("text-negative")
@@ -588,7 +588,7 @@ def register_workspace_pages(
             changed = changed_count(session, workspace.id)
             warning = expiry_warning_days(workspace)
             schema = schema_cache.get(profile)
-            columns = workspace_columns(schema, _script_columns(session, workspace))
+            columns = workspace_columns(schema, script_column_keys(session, workspace))
 
         page_header(name, user)
         ui.add_head_html(GRID_HEAD)
@@ -872,6 +872,11 @@ def register_workspace_pages(
             action_button("open_in_full", t("Spalten an Anzeige anpassen"), fit_display)
             action_button("edit_note", t("Wert auf Ziel setzen"), apply_value)
             action_button("undo", t("Änderungen verwerfen"), revert_selection)
+            action_button(
+                "fact_check",
+                t("Review und schreiben"),
+                lambda: ui.navigate.to(f"/workspaces/{workspace_id}/review"),
+            )
             action_button("close", t("Arbeitsbestand schließen"), close_workspace_now)
 
         filter_input.on("keydown.enter", lambda _: apply_filter_now())
@@ -886,4 +891,10 @@ def _expiry_text(workspace: Workspace) -> str:
     return f"laeuft in {warning} Tagen ab"
 
 
-__all__ = ["column_def", "register_workspace_pages", "workspace_columns"]
+__all__ = [
+    "column_def",
+    "owned_workspace",
+    "register_workspace_pages",
+    "script_column_keys",
+    "workspace_columns",
+]

@@ -3,7 +3,7 @@
 ## Purpose
 
 - Python-Paket der NiceGUI-Anwendung: Konfiguration, Datenbank, Anmeldung und Rechte.
-  Fachseiten (Profile, Scripts, Grid, Review, Runs) folgen in den naechsten Meilensteinen.
+  Fachseiten: Profile, Scripts, Arbeitsbestaende mit Grid, Review und Schreiblauf.
 
 ## Ownership
 
@@ -24,16 +24,25 @@
   fuer den Diff, `display_value`.
 - `workspaces.py`: Arbeitsbestaende (Snapshot in `workspace_asset.values_json`,
   ChangeSet in `workspace_change`), effektive Seiten mit Filter/Sortierung,
-  Massenaktionen, Ablauf und Revision; `load_assets` laedt Script-Ergebnisse.
+  Massenaktionen, Ablauf und Revision; `load_assets` laedt Script-Ergebnisse,
+  `file_values` liest Spaltenwerte eines Payloads, `commit_applied` uebernimmt
+  geschriebene Felder in den Snapshot und leert ihre Aenderung.
+- `writeplan.py`: Schreibplan aus dem ChangeSet (`build_preview`, Gruppierung gleicher
+  Payloads in Schritte zu `CHUNK_SIZE`), Payload-Bildung je Feldtyp, Digest des Entwurfs
+  (`current_digest`), Konflikterkennung ueber `modifyDate` und Persistenz (`save_plan`).
+- `writer.py`: Review gegen die API (`review`, `read_files`), Dry Run, Ausfuehrung,
+  Rueckleseverifikation und Protokoll (`dry_run`, `execute`, `reconcile`).
 - `profiles.py`: Profile anlegen und aendern (API-Key verschluesselt, Hint statt Key),
   Verbindungstest protokollieren, Host normalisieren; schreibt `AdminAudit`-Eintraege.
 - `clients.py`: `ClientFactory` haelt je Profil einen pixx.io-Client, ent- und
-  verschluesselt den Key nur dort und liefert `current_user_name` fuer Verbindungstests.
+  verschluesselt den Key nur dort und liefert `current_user_name` fuer Verbindungstests;
+  `writer_client_for` liefert einen Client ohne automatische PUT-Wiederholungen.
 - `ui/`: `guard.py` (Session- und Rollenpruefung), `shell.py` (Palette, Kopfzeile mit
   Sprachumschalter), `widgets.py` (Icon-Button mit Tooltip, Navigationslink),
   `admin.py` (Seiten `/admin/profiles` und `/admin/users`), `scripts.py` (Liste und Editor
   unter `/scripts`), `workspaces.py` (Liste `/workspaces`, Grid `/workspaces/{id}`,
-  Datenendpunkte `/workspace/rows` und `/workspace/changes`); Details in `ui/AGENTS.md`.
+  Datenendpunkte `/workspace/rows` und `/workspace/changes`), `review.py`
+  (`/workspaces/{id}/review`: Aenderungsliste, Dry Run, Schreiben); Details in `ui/AGENTS.md`.
 - `i18n.py`: Oberflächentexte; deutscher Quelltext plus englische Übersetzung. Jeder
   sichtbare Text läuft über `t(...)`, die Sprache liegt in der Session.
 - `scripts/`: Abfrage-Scripts mit Vertrag, RestrictedPython, read-only Fassade `px`,
@@ -58,6 +67,23 @@
 
 - Neue Spalten oder Tabellen nur als Alembic-Revision; `test_migrationen_passen_zu_modellen`
   und `alembic check` muessen ohne Diff bleiben.
+- Ein Schreibplan ist unveraenderlich und ueber `change_digest` an das ChangeSet gebunden.
+  Aendert sich der Entwurf, blockiert `execute` mit `WriteError`; Dry Run und Live-Lauf
+  verwenden denselben Plan (`write_plan.status` wechselt `draft` -> `running` -> Endzustand).
+- Nur geaenderte Felder aufnehmen, identische Payloads gruppieren (ein `filesPut` je
+  Payload und `CHUNK_SIZE`-Block). Konflikte werden ueber `modifyDate` erkannt; externe
+  Aenderungen verlangen `overwrite_confirmed`.
+- Der Writer sendet nichts blind erneut: `writer_client_for` (max_retries=0), Job-ID vor
+  dem Warten speichern, danach zuruecklesen. Erfolg entsteht aus Job-Ergebnis plus
+  Ruecklesung; unklare Ausgaenge werden `StepStatus.UNKNOWN`, nie Erfolg.
+- Ein systematischer Fehler (`Unauthorized`, `Forbidden`) pausiert den Rest des Auftrags:
+  verbleibende Schritte werden `skipped`. `reconcile` prueft bekannte Schritte nach einem
+  Neustart ohne erneutes Senden.
+- Nach vollstaendig erfolgreichem Lauf uebernimmt `commit_applied` die geschriebenen Felder
+  in den Snapshot und entfernt sie aus dem ChangeSet; `ChangeLog` bleibt als Protokoll.
+- `ChangeStatus` umfasst `planned`, `ok`, `failed`, `skipped`, `skipped_conflict`,
+  `unknown`; `StepStatus` zusaetzlich `partial`. Beide Wertebereiche sind per CHECK
+  abgesichert (Revision `0002`).
 - Werte im effektiven Stand immer als `CASE WHEN change.id IS NOT NULL THEN change.new_value
   ELSE json_extract(...) END` ausdruecken; `COALESCE` wuerde geleerte Werte falsch aufloesen.
 - Spaltenkennungen sind durchgaengig `std:<attribut>`, `custom:<feld-id>` oder

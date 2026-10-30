@@ -21,14 +21,14 @@ from app.i18n import (
 )
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
-UI_MODULES = sorted((APP_ROOT / "ui").glob("*.py")) + [APP_ROOT / "main.py"]
+APP_MODULES = sorted(APP_ROOT.rglob("*.py"))
 GERMAN_UMLAUTS = set("äöüÄÖÜ")
 
 
 def used_keys() -> set[str]:
     """Sammelt alle mit ``t("...")`` verwendeten Quelltexte."""
     keys: set[str] = set()
-    for path in UI_MODULES:
+    for path in APP_MODULES:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if (

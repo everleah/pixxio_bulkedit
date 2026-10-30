@@ -172,6 +172,26 @@ Namen vor dem Senden auf.
 - Entwürfe laufen nach 30 Tagen Inaktivität ab; ab sieben Resttagen warnt die Liste.
   Schließen entfernt den Arbeitsbestand aus der Liste, Löschen entfernt ihn ganz.
 
+## Review und Schreiben
+
+`/workspaces/{id}/review` zeigt jede geplante Feldänderung (Datei, Feld, alt → neu) und
+schreibt erst nach Dry Run und Bestätigung.
+
+- Geschrieben werden ausschließlich geänderte Felder; identische Payloads werden
+  gruppiert (ein `filesPut` je Payload und Block von 200 IDs).
+- Der Plan ist unveränderlich und über einen Digest an den Entwurf gebunden. Ändert sich
+  der Entwurf nach dem Review, blockiert der Lauf und verlangt einen neuen Dry Run.
+- Externe Änderungen erkennt der Review am `modifyDate` des Snapshots; sie verlangen die
+  ausdrückliche Bestätigung „Externe Änderungen überschreiben". Laufende Schreibaufträge
+  auf demselben Host werden profilübergreifend als Hinweis gemeldet.
+- Der Writer nutzt einen Client ohne automatische PUT-Wiederholungen, speichert die
+  Job-ID vor dem Warten und liest jedes Ergebnis zurück. Unklare Ausgänge werden als
+  „unklar" ausgewiesen und nie blind wiederholt; Autorisierungsfehler pausieren den Rest
+  des Auftrags.
+- Nach vollständigem Erfolg wandern die geschriebenen Werte in den Snapshot und
+  verschwinden aus dem Entwurf; `run` und `change_log` bleiben als Protokoll (Grundlage
+  für Audit und Undo).
+
 ## Oberfläche und Sprache
 
 Die Oberfläche ist zweisprachig (Deutsch und Englisch). Deutsch ist die Quelle: alle
