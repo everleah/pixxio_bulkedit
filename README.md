@@ -179,6 +179,8 @@ Namen vor dem Senden auf.
   (Spalte, Filtertext, „nur geänderte Zeilen" plus die zugehörigen Icons), zweite Zeile
   Massenänderung (Zielspalte, Wert, Ziel plus „Wert auf Ziel setzen" und „Änderungen
   verwerfen"), darunter die Spaltenwerkzeuge und rechts Export, Review und Schließen.
+  Das Wertefeld der Massenänderung passt sich der Zielspalte an: Auswahllisten zeigen ihre
+  Werte, Wahrheitswerte ja/nein, Datumsfelder ein Textfeld mit Kalender, sonst Text.
 - „Spalten auswählen" (Icon `view_column`) öffnet die Spaltenauswahl: alle Felder des
   Profils in drei Gruppen (Standardattribute, eigene Metadatenfelder,
   Standard-Metadatenfelder), **innerhalb der Gruppe alphabetisch sortiert**, mit
@@ -187,9 +189,10 @@ Namen vor dem Senden auf.
   gespeichert (höchstens 80 Spalten) und wirkt auch auf Filter, Sortierung und
   Excel-Export. „Zurücksetzen" stellt die Script- beziehungsweise Standardspalten wieder
   her. Bereits sichtbare Spalten behalten ihre Position; neu gewählte Spalten kommen in
-  Dialogreihenfolge hinten dazu und werden nach dem Übernehmen ins Bild gescrollt. Werte
-  für neu hinzugekommene Spalten werden beim Übernehmen aus pixx.io nachgeladen, damit
-  die Zellen sofort gefüllt sind und Bearbeitungen darin sichtbar bleiben.
+  Dialogreihenfolge hinten dazu und werden nach dem Übernehmen ins Bild gescrollt. Die
+  Seite lädt sofort neu; Werte für neu hinzugekommene Spalten werden anschließend im
+  Hintergrund aus pixx.io geholt („Werte der neuen Spalten werden geladen …"), damit die
+  Zellen von selbst voll werden und Bearbeitungen darin sichtbar bleiben.
 
   > Hinweis: Ein Profil kann sehr viele Standard-Metadatenfelder mitbringen (im
   > Testsystem rund 390). Ohne Feldfilter ist die Liste lang; „Alle" wählt dann nur bis

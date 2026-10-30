@@ -312,6 +312,8 @@ EN_TRANSLATIONS: dict[str, str] = {
     "Spalten an Inhalt anpassen": "Size columns to content",
     "Spalten an Anzeige anpassen": "Size columns to display",
     "Wert auf Ziel setzen": "Set value on target",
+    "Fertig": "Done",
+    "Werte der neuen Spalten werden geladen …": "Loading values for the new columns …",
     "Änderungen verwerfen": "Discard changes",
     "Datum als JJJJ-MM-TT oder TT.MM.JJJJ, Uhrzeit HH:MM:SS": "Date as YYYY-MM-DD or DD.MM.YYYY, time HH:MM:SS",
     "Zahl, Dezimaltrennzeichen Komma oder Punkt": "Number, decimal separator comma or dot",

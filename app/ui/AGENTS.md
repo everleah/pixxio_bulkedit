@@ -133,12 +133,22 @@
   Reihenfolge der Auswahl: bereits sichtbare Spalten behalten ihre Position, neue kommen
   in Dialogreihenfolge hinten dazu. So verschiebt "Uebernehmen" keine bestehende Ansicht,
   und Grid und Excel-Export zeigen dieselbe Reihenfolge.
-- Nach "Uebernehmen" laedt die Seite Werte fuer Spalten nach, die noch nicht im Snapshot
-  stehen (`missing_columns` + `read_files` in `run.io_bound`, dann
-  `merge_snapshot_values`), und laedt erst danach neu. Ohne diesen Schritt blieben neue
-  Spalten leer und Bearbeitungen darin unsichtbar. Die erste neu hinzugekommene Spalte
-  merkt sich `_store_scroll_hint` in der Session; `after_grid_ready` scrollt sie mit
-  `ensureColumnVisible` ins Bild, weil sie sonst ausserhalb des sichtbaren Bereichs liegt.
+- Nach "Uebernehmen" laedt die Seite sofort neu (`ui.navigate.reload`); das Nachladen der
+  Werte fuer Spalten, die noch nicht im Snapshot stehen, laeuft **nach** dem Aufbau der
+  Seite (`after_grid_ready` -> `fill_missing_values` mit `missing_columns` +
+  `read_files` in `run.io_bound`, dann `merge_snapshot_values` und
+  `purgeInfiniteCache`). Wuerde das Nachladen vor dem Neuladen laufen, wartet der Nutzer
+  bei grossen Arbeitsbestaenden ohne sichtbare Reaktion auf die API und laedt die Seite
+  von Hand neu — dann bricht die Coroutine ab, und die neuen Spalten bleiben leer.
+  Solange geladen wird, zeigt "Werte der neuen Spalten werden geladen …" den Zustand.
+  Die erste neu hinzugekommene Spalte merkt sich `_store_scroll_hint` in der Session;
+  `after_grid_ready` scrollt sie mit `ensureColumnVisible` ins Bild, weil sie sonst
+  ausserhalb des sichtbaren Bereichs liegt.
+- Das Eingabefeld fuer Massenaenderungen haengt am Typ der Zielspalte (`_value_widget`):
+  Auswahlfelder bekommen die Auswahlwerte, Wahrheitswerte ja/nein, Datumsfelder ein
+  Textfeld mit Kalender (`ui.date`) und die uebrigen ein Textfeld. Beim Wechsel der
+  Zielspalte wird das Feld neu gebaut (`_render_value_input`); gelesen wird der Wert
+  anschliessend aus `value_state["widget"]`.
 - Zahl- und Datumsspalten nutzen `agTextCellEditor` (kein `agNumberCellEditor` bzw.
   `agDateStringCellEditor`): Die Zahleneingabe verwirft Kommas, die Datumseingabe
   akzeptiert nur die Reihenfolge des Browsers — in beiden Faellen leert ein Tippen die
@@ -166,17 +176,22 @@
   Speichern-Knopf sehen, aber einen Dry Run ausfuehren.
 - `/workspaces`: bestehenden Arbeitsbestand oeffnen, eine Zelle bearbeiten (Status zeigt
   eine Aenderung und eine hoehere Revision), "nur geaenderte Zeilen" sowie Wertfilter
-  pruefen, Bulk-Wert setzen und Aenderungen verwerfen.
+  pruefen und Aenderungen verwerfen.
 - `/workspaces/{id}/review`: Dry Run ausfuehren (Protokolleintrag mit Status `ok`), dann
   "Jetzt schreiben"; nach Erfolg steht die Aenderungszahl auf 0 und die Werte sind im Grid
   sichtbar. Mit einer extern geaenderten Datei muss der Lauf ohne Bestaetigung blockieren.
 - Spaltenauswahl: "Spalten auswaehlen" oeffnen, Feldfilter nutzen, "Alle"/"Keine",
-  "Uebernehmen" und "Zuruecksetzen" pruefen; das Grid zeigt danach genau die gewaehlten
-  Spalten, bereits sichtbare an ihrer Position und neue hinten (die erste neue wird
-  sichtbar gescrollt); die Auswahl ueberlebt ein Neuladen der Seite.
+  "Uebernehmen" und "Zuruecksetzen" pruefen; die Seite laedt sofort neu, das Grid zeigt
+  genau die gewaehlten Spalten — bereits sichtbare an ihrer Position, neue hinten (die
+  erste neue wird sichtbar gescrollt) —, und fehlende Werte erscheinen kurz danach
+  ("Werte der neuen Spalten werden geladen …"), ohne dass die Seite erneut geladen wird.
+  Die Auswahl ueberlebt ein Neuladen der Seite.
 - Zelleditoren je Typ pruefen: Text, Zahl mit Komma ("1,5"), Datum als "31.12.2026"
   (erscheint als "2026-12-31 00:00:00") und als "morgen" (Fehlermeldung, Zelle behaelt
   den gespeicherten Wert), Auswahlliste mit gefuellten Optionen.
+- Massenaenderung: Zielspalte waehlen, Wert eintragen, Ziel (markierte/gefilterte/alle)
+  waehlen und "Wert auf Ziel setzen"; das Wertefeld wechselt mit der Zielspalte
+  (Auswahlfeld, Datumsfeld mit Kalender, sonst Textfeld).
 - Excel: im Grid exportieren, in der Arbeitsmappe eine Zelle aendern, ueber `/workspaces`
   importieren; der neue Arbeitsbestand zeigt genau diese Aenderung, und die Review-Seite
   schreibt sie mit `run.source = xlsx`.

@@ -991,6 +991,7 @@ def register_workspace_pages(
             expiry_date = workspace.expires_at.strftime("%d.%m.%Y") if workspace.expires_at else ""
             schema = schema_cache.get(profile)
             columns = view_columns(session, workspace, schema)
+            missing = missing_columns(session, workspace, columns)
 
         scroll_hint = _take_scroll_hint()
         focus_key = (
@@ -1039,6 +1040,8 @@ def register_workspace_pages(
         ui.label(
             t("Der Entwurf wurde in einem anderen Tab geändert. Bitte die Seite neu laden.")
         ).classes("ws-conflict").props('id="ws-conflict"')
+        load_hint = ui.label(t("Werte der neuen Spalten werden geladen …")).classes("text-xs")
+        load_hint.set_visibility(bool(missing))
 
         column_options = {column.key: column.label for column in columns}
         writable = [column for column in columns if column.writable]
@@ -1163,14 +1166,17 @@ def register_workspace_pages(
                 built["bulk"] = False
             _refresh_counter()
 
-        async def _load_missing(profile_row: Profile, wanted: Sequence[ColumnDef]) -> int:
-            """Laedt Werte nach, die fuer die neue Auswahl noch im Snapshot fehlen."""
+        async def _load_missing(wanted: Sequence[ColumnDef]) -> int:
+            """Laedt Werte nach, die fuer die aktuelle Auswahl noch im Snapshot fehlen."""
             from app.writer import read_files
 
             def job() -> int:
                 with session_scope(session_factory) as session:
                     current = session.get(Workspace, workspace_id)
                     if current is None:
+                        return 0
+                    profile_row = session.get(Profile, current.profile_id)
+                    if profile_row is None:
                         return 0
                     missing = missing_columns(session, current, wanted)
                     if not missing:
@@ -1209,13 +1215,8 @@ def register_workspace_pages(
                 except WorkspaceError as exc:
                     ui.notify(describe_error(exc), color="negative")
                     return
-                profile_row = session.get(Profile, current.profile_id)
-                known = {column.key: column for column in all_columns}
-                wanted = [known[key] for key in stored if key in known]
             column_dialog.close()
             ui.notify(t("{count} Spalten übernommen.", count=len(stored)))
-            if profile_row is not None:
-                await _load_missing(profile_row, wanted)
             if added:
                 _store_scroll_hint(workspace_id, added[0])
             ui.navigate.reload()
@@ -1267,7 +1268,8 @@ def register_workspace_pages(
                 .props("outlined dense")
                 .classes("w-44")
             )
-            value_input = ui.input(t("Wert")).props("outlined dense").classes("w-36")
+            value_slot = ui.element("div").classes("w-44")
+            value_state: dict[str, Any] = {"widget": None}
             target_scope_select = (
                 ui.select(
                     {
@@ -1282,6 +1284,43 @@ def register_workspace_pages(
                 .classes("w-40")
             )
 
+        def _value_widget(column: ColumnDef | None) -> Any:
+            """Eingabe passend zum Feldtyp der Zielspalte."""
+            value_slot.clear()
+            with value_slot:
+                if column is not None and column.edit_type == "selection" and column.options:
+                    return (
+                        ui.select({name: name for name in column.options}, label=t("Wert"))
+                        .props("outlined dense clearable")
+                        .classes("w-full")
+                    )
+                if column is not None and column.edit_type == "boolean":
+                    return (
+                        ui.select({"ja": t("ja"), "nein": t("nein")}, label=t("Wert"))
+                        .props("outlined dense clearable")
+                        .classes("w-full")
+                    )
+                if column is not None and column.edit_type == "date":
+                    widget = (
+                        ui.input(t("Wert"))
+                        .props("outlined dense")
+                        .props('placeholder="JJJJ-MM-TT"')
+                        .classes("w-full")
+                    )
+                    with ui.menu().props("no-parent-event") as menu:
+                        with ui.date().bind_value(widget):
+                            with ui.row().classes("w-full justify-end"):
+                                ui.button(t("Fertig"), on_click=menu.close).props("flat dense")
+                    with widget.add_slot("append"):
+                        ui.icon("edit_calendar").on("click", menu.open).classes("cursor-pointer")
+                    return widget
+                return ui.input(t("Wert")).props("outlined dense").classes("w-full")
+
+        def _render_value_input() -> None:
+            value_state["widget"] = _value_widget(_column_for(columns, target_column_select.value))
+
+        _render_value_input()
+        target_column_select.on_value_change(lambda _: _render_value_input())
         grid_options: dict[str, Any] = {
             "columnDefs": [
                 {
@@ -1324,6 +1363,20 @@ def register_workspace_pages(
             await ui.run_javascript("window.__ws && window.__ws.loadChanges()", timeout=10)
             await grid.run_grid_method("purgeInfiniteCache")
             await refresh_status()
+
+        async def fill_missing_values() -> None:
+            """Werte nachladen, die fuer die aktuelle Spaltenauswahl noch fehlen."""
+            nonlocal missing
+            wanted, missing = missing, []
+            if not wanted:
+                return
+            load_hint.set_visibility(True)
+            try:
+                filled = await _load_missing(wanted)
+            finally:
+                load_hint.set_visibility(False)
+            if filled:
+                await grid.run_grid_method("purgeInfiniteCache")
 
         def apply_filter() -> None:
             state["filter"] = filter_input.value or ""
@@ -1449,7 +1502,7 @@ def register_workspace_pages(
                         session,
                         current,
                         column=column,
-                        value=value_input.value,
+                        value=value_state["widget"].value if value_state["widget"] else None,
                         file_ids=target_ids,
                         actor=session.get(AppUser, user.id),
                     )
@@ -1578,12 +1631,12 @@ def register_workspace_pages(
 
         async def after_grid_ready() -> None:
             await reload_changes_and_grid()
-            if not focus_key:
-                return
-            try:
-                await grid.run_grid_method("ensureColumnVisible", focus_key)
-            except Exception:  # noqa: BLE001 - reine Anzeigehilfe
-                pass
+            if focus_key:
+                try:
+                    await grid.run_grid_method("ensureColumnVisible", focus_key)
+                except Exception:  # noqa: BLE001 - reine Anzeigehilfe
+                    pass
+            await fill_missing_values()
 
         grid.on("gridReady", after_grid_ready, args=[])
 
