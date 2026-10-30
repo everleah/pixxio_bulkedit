@@ -162,9 +162,10 @@ ergaenzt werden; eine Collection allein bleibt keine Schutzgrenze.
 - `filesPut` ist **nicht atomar**: enthaelt ein Request ein unbekanntes Feld, antwortet die
   API mit einem Fehler, schreibt die gueltigen Felder aber trotzdem. Der Writer muss vor
   dem Senden validieren und nach Teilfehlern ruecklesen.
-- Datumsfelder akzeptieren `YYYY-MM-DD HH:MM:SS`; ein ISO-Wert mit Offset
-  (`2026-12-31T23:45:00+00:00`) wird mit `no DateTime` abgelehnt. Der gespeicherte Wert
-  kommt unveraendert zurueck; die Zeitzonen-Semantik des Servers bleibt offen.
+- Datumsfelder: gespeichert wird `YYYY-MM-DD HH:MM:SS`. Ein Wert mit `T`-Separator wird
+  akzeptiert und normalisiert, Mikrosekunden werden abgeschnitten. Abgelehnt werden ein
+  Datum ohne Uhrzeit (`2026-12-31`), fehlende Sekunden (`2026-12-31 23:45`) und Werte mit
+  Offset (`2026-12-31T23:45:00+02:00`) mit `no DateTime`.
 - Die Testinstanz fuehrt 9 Collections (4 dynamisch, 5 statisch). Seitenabrufe liefern
   `cursor` nur auf nicht-letzten Seiten; 14 Assets wurden ueber 3 Seiten gelesen.
 - Diese Instanz hat keine Custom-Felder mit `editType` `number` oder `boolean`; diese
@@ -315,9 +316,10 @@ Kindprozess (`worker.py`), Runner mit Zeitlimit (`runner.py`), Versionierung und
   archivierten Assets). `includeSubdirectories` bleibt ungeprueft (keine Dateien in
   Unterverzeichnissen).
 - Die `directories`-API akzeptiert `pageSize` bis 20; der Client-Default 100 liess
-  `Directory.get_all()` scheitern. Behoben im Client (`_max_page_size = 20`, Auslieferung
-  als 0.4.5). Gueltige `responseFields` sind `id`, `createDate`, `modifyDate`, `parentID`,
-  `name`, `quantity`, `quantityWithSubdirectories`, `permissions`, `hasChildren`.
+  `Directory.get_all()` scheitern. Behoben im Client (`_max_page_size = 20`, ab 0.4.5) und
+  live geprueft (39 Verzeichnisse mit Default-Paging). Gueltige `responseFields` sind `id`,
+  `createDate`, `modifyDate`, `parentID`, `name`, `quantity`, `quantityWithSubdirectories`,
+  `permissions`, `hasChildren`.
 - Das Testsystem fuehrt 19 Custom- und 376 Standard-Metadatenfelder; `metadata_fields`
   laedt beide vollstaendig (395 Eintraege) unabhaengig vom Zeilenlimit des Profils.
 
@@ -346,6 +348,15 @@ Schreibmoeglichkeit Assets fuer einen Arbeitsbestand bestimmen.
 - Ablaufdatum anzeigen; unter sieben verbleibenden Tagen warnen.
 - Nach 30 Tagen Inaktivitaet loeschen, sofern nicht bewusst verlaengert.
 - Laufende Schreibauftraege von der Entwurfsbereinigung ausnehmen.
+
+Umgesetzt (30.10.2026, Backend): `app/schema.py` (Spaltenkennungen `std:*`, `custom:<id>`,
+`standard:<id>`, Auflösung von Namen, `SchemaCache` mit 15 Minuten TTL), `app/normalize.py`
+(Anzeigenormalform je Feldtyp; Texte bleiben unveraendert, Datum wird zu
+`YYYY-MM-DD HH:MM:SS`, Mehrfachauswahl zur Liste) und `app/workspaces.py` (Snapshot in
+`workspace_asset.values_json`, ChangeSet nur fuer abweichende Zellen, effektive Seiten mit
+Filter/Sortierung/`nur geänderte Zeilen`, Massenaktionen, Zielauflösung, Ablauf nach 30
+Tagen, `edit_revision` fuer mehrere Tabs, `load_assets` fuer Filter- und ID-Ergebnisse).
+Die Grid-Oberflaeche folgt als naechster Schritt.
 
 ### Massenaktionen
 

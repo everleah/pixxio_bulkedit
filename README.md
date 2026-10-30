@@ -44,7 +44,7 @@ neueres Release liegt. Lokal vorhandene, unveroeffentlichte Client-Funktionen
 duerfen nicht als auf PyPI verfuegbar vorausgesetzt werden. Updates erfolgen bewusst
 bei Einrichtung beziehungsweise Wartung, nicht automatisch beim App-Start.
 
-Fuer Abnahmen dokumentierter Stand: `pixxio-client 0.4.4` (PyPI, 30.10.2026).
+Fuer Abnahmen dokumentierter Stand: `pixxio-client 0.4.5` (PyPI, 30.10.2026).
 
 ## Projektstruktur
 

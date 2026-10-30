@@ -18,6 +18,13 @@
 - `auth.py`: Argon2id-Hashes, Rollen und Rechte, Login-Drosselung, Session-Helfer,
   Schutz des letzten aktiven Superusers.
 - `colors.py`: Meadow-Palette und WCAG-Kontrastberechnung.
+- `schema.py`: Profilschema mit `ColumnDef` (Schluessel `std:*`, `custom:<id>`,
+  `standard:<id>`), `resolve_columns` (IDs oder Namen), `SchemaCache` mit TTL.
+- `normalize.py`: Anzeigenormalform je Feldtyp (Texte bleiben exakt), `values_equal`
+  fuer den Diff, `display_value`.
+- `workspaces.py`: Arbeitsbestaende (Snapshot in `workspace_asset.values_json`,
+  ChangeSet in `workspace_change`), effektive Seiten mit Filter/Sortierung,
+  Massenaktionen, Ablauf und Revision; `load_assets` laedt Script-Ergebnisse.
 - `profiles.py`: Profile anlegen und aendern (API-Key verschluesselt, Hint statt Key),
   Verbindungstest protokollieren, Host normalisieren; schreibt `AdminAudit`-Eintraege.
 - `clients.py`: `ClientFactory` haelt je Profil einen pixx.io-Client, ent- und
@@ -49,6 +56,18 @@
   und `alembic check` muessen ohne Diff bleiben.
 - Werte im effektiven Stand immer als `CASE WHEN change.id IS NOT NULL THEN change.new_value
   ELSE json_extract(...) END` ausdruecken; `COALESCE` wuerde geleerte Werte falsch aufloesen.
+- Spaltenkennungen sind durchgaengig `std:<attribut>`, `custom:<feld-id>` oder
+  `standard:<feld-id>`; Namen aus `COLUMNS` loest `app/schema.py` vor dem Speichern auf.
+- Der Snapshot (`workspace_asset.values_json`) haelt Anzeigenormalform; das ChangeSet nur
+  Zellen, deren Wert abweicht. Geloeschte Werte stehen als `NULL` im ChangeSet.
+- Texte werden nie automatisch getrimmt; normalisiert werden nur Typen, Datumsformate und
+  Mehrfachauswahlen (`app/normalize.py`).
+- `workspace.edit_revision` erhoeht sich bei jeder Aenderung; Clients muessen ihre Revision
+  mitsenden, sonst antwortet der Service mit `WorkspaceConflictError` (mehrere Tabs).
+- Entwuerfe laufen nach `DRAFT_TTL_DAYS` (30) ab; unter `EXPIRY_WARNING_DAYS` (7) Resttagen
+  warnt die UI. Laufende Schreibauftraege verlaengern die Laufzeit.
+- Standardattribute der Datei (`std:*`) und Metadaten (`custom:*`, `standard:*`) werden
+  getrennt gelesen: erstere direkt am File, letztere aus `metadataFields[str(feld_id)]`.
 - `app/bench/` arbeitet offline auf synthetischen Daten und nie auf der Anwendungsdatenbank.
 - Die Prototyp-Route `/bench` und `/bench/rows` gehoert nur zum Lastnachweis; Fachseiten
   entstehen getrennt davon.
@@ -73,7 +92,9 @@
 - `pageSize`: `files` bis 500, `customMetadata` bis 50, `standardMetadata` ohne Paging
   (`FILES_PAGE_SIZE`/`METADATA_PAGE_SIZE` aus `app/spike/client.py` nutzen).
 - `filesPut` ist nicht atomar: vor dem Senden validieren und nach Teilfehlern ruecklesen.
-- Datumswerte als `YYYY-MM-DD HH:MM:SS` senden; ISO mit Offset lehnt die API ab.
+- Datumswerte als `YYYY-MM-DD HH:MM:SS` senden. Die API akzeptiert zusaetzlich den
+  `T`-Separator und schneidet Mikrosekunden ab, lehnt aber ein Datum ohne Uhrzeit
+  (`2026-12-31`) und Werte mit Offset (`...+02:00`) mit `no DateTime` ab.
 
 ## Work Guidance
 

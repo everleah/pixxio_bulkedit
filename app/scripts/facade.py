@@ -24,6 +24,8 @@ FILES_PAGE_SIZE = 500
 METADATA_PAGE_SIZE = 50
 # Die directories-API akzeptiert hoechstens 20 Eintraege pro Seite.
 DIRECTORY_PAGE_SIZE = 20
+# Collections erlauben bis 500 Eintraege pro Seite.
+COLLECTION_PAGE_SIZE = 500
 # Das Schema ist unabhaengig vom Zeilenlimit des Profils vollstaendig zu laden.
 METADATA_FIELD_LIMIT = 5_000
 COLLECTION_FIELDS = ["id", "name", "isDynamic", "filesQuantity"]
@@ -264,7 +266,7 @@ class Facade:
             hits = [
                 plain(item)
                 for item in resource.iter_all(
-                    page_size=METADATA_PAGE_SIZE, max_items=self.max_rows, searchTerm=text
+                    page_size=COLLECTION_PAGE_SIZE, max_items=self.max_rows, searchTerm=text
                 )
             ]
             exact = [hit for hit in hits if str(hit.get("name")) == text]
@@ -282,7 +284,7 @@ class Facade:
         def load() -> list[dict[str, Any]]:
             resource = Collection(client)
             resource.set_response_fields(COLLECTION_FIELDS)
-            params: dict[str, Any] = {"page_size": METADATA_PAGE_SIZE, "max_items": self.max_rows}
+            params: dict[str, Any] = {"page_size": COLLECTION_PAGE_SIZE, "max_items": self.max_rows}
             if search:
                 params["searchTerm"] = search
             return [plain(item) for item in resource.iter_all(**params)]

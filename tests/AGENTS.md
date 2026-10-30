@@ -25,6 +25,10 @@
 - `test_scripts.py`: Script-Vertrag (`PARAMS`, `COLUMNS`, Filter, Ergebnisse),
   RestrictedPython-Abweisungen, Fassade gegen einen nachgebauten Client, Versionierung
   und Vorlagen sowie der Kindprozess mit Zeitlimit.
+- `test_workspaces.py`: Normalisierung (Texte exakt, Datum/Zahl/Boolean/Auswahl),
+  Schemaaufloesung und SchemaCache, Arbeitsbestaende (Snapshot, ChangeSet, Revision,
+  effektive Seiten mit Filter/Sortierung, Massenaktionen, Ablauf) und der Loader gegen
+  einen nachgebauten Client.
 
 ## Local Contracts
 
