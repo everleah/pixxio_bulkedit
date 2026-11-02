@@ -87,7 +87,8 @@ Default section order:
 - `tests/AGENTS.md`: Offline-Tests der Anwendung und der Entwicklungsbasis.
 - Root-owned: `README.md`, `LICENSE`, `.gitignore`, `.gitattributes`, `.env.example`,
   `requirements*.txt`, `pyproject.toml`, `.vscode/`, `alembic.ini` und `migrations/`
-  (Alembic-Umgebung und Revisionen) sowie die Deployment-Dateien `Dockerfile`,
+  (Alembic-Umgebung und Revisionen), `docs/screenshots/` (in `README.md` verwendete
+  Oberflaechenbilder mit synthetischen Demodaten) sowie die Deployment-Dateien `Dockerfile`,
   `.dockerignore`, `docker-compose.vps.yml`, `.env.vps.example`, `push-to-forgejo.ps1`,
   `deploy-vps.sh`, `backup.sh` und `restore.sh`. `.env.example` und `.env.vps.example`
   sind die einzigen Vorlagen; echte `.env`-Dateien, `backup.key` und `backups/` bleiben
